@@ -60,7 +60,7 @@ Notebooks are for narrative and figures. All model logic would live in `src/` an
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/[your-org]/f1-tyre-degradation.git
+   git clone https://github.com/Abhaybhabhu/MDM3---F1.git
    cd f1-tyre-degradation
    ```
 
