@@ -2,7 +2,7 @@
 
 A physics-based model for predicting the onset of tyre performance degradation ("the cliff") in Formula 1, built on publicly available telemetry data via the FastF1 API.
 
-This is a 10-credit group project for third-year engineering/mathematics students at University of Bristol.
+This is a 10-credit group project for third-year EngMaths students at University of Bristol.
 
 ---
 
@@ -11,6 +11,16 @@ This is a 10-credit group project for third-year engineering/mathematics student
 Can a physics-based model of tyre degradation predict the onset time of the performance cliff in Formula 1?
 
 ---
+
+
+| Section | Description |
+|---|---|
+| [Research Question](#research-question) | What we're trying to answer |
+| [Model Overview](#model-overview) | ODE system and Magic Formula |
+| [Repository Structure](#repository-structure) | Folder layout |
+| [Setup](#setup) | Installation and data regeneration |
+| [Dependencies](#dependencies) | Key packages |
+| [Data](#data) | Available FastF1 channels |
 
 ## Model Overview
 
