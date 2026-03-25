@@ -681,6 +681,9 @@ def engineer_features(
     """
 
     if verbose:
+        print(f"{laps[['LapStartDate']].head()=}")  # print first few rows to verify LapTimeSec and GapToCarAhead look correct
+
+    if verbose:
         print(f"     Engineering features for {location}...")
 
     laps = laps.copy()
@@ -743,8 +746,15 @@ def engineer_features(
 
     weather = None
     try:
+        if verbose:
+            print("       Loading weather data...")
         weather = session.weather_data
     except Exception:
+        if verbose:
+            print(
+                f"       Weather: failed to load weather data, "
+                f"using NaN for weather features"
+            )
         pass
 
     if (
@@ -812,11 +822,24 @@ def engineer_features(
     for col in ["AirTemp", "TrackTemp", "Humidity", "WindSpeed"]:
         if col not in laps.columns:
             laps[col] = np.nan
+    
+    if verbose:
+        print(
+            f"       Weather feature stats:\n"
+            f"{laps[['AirTemp', 'TrackTemp', 'Humidity', 'WindSpeed']].describe()}"
+        )
+        # After building weather["_merge_time"]:
+        print(f"       Weather time dtype: {weather['_merge_time'].dtype}")
+        print(f"       Weather time range: {weather['_merge_time'].min()} → {weather['_merge_time'].max()}")
+        print(f"       LapStartDate dtype: {laps['LapStartDate'].dtype}")
+        print(f"       LapStartDate range: {laps['LapStartDate'].min()} → {laps['LapStartDate'].max()}")
+        print(f"       session.date: {session.date}")
+        print(f"       Weather sample:\n{weather[['_merge_time'] + available_cols].head()}")
+        print(f"       Lap data sample:\n {laps[['Time', 'LapTime', 'LapStartDate']].head(10)}")
 
     # ══════════════════════════════════════════════════════════
     # E) TRACK FEATURES
-    # ══════════════════════════════════════════════════════════
-
+    # ════════════════════════════════════════════════
     laps["TrackName"] = location
     laps["CircuitLength"] = circuit_length_km
     laps["NumberOfCorners"] = num_corners
@@ -939,6 +962,10 @@ def process_session(
             year, round_number, event_name, "no_lap_data"
         )
         return None
+    
+    # try to recompute Lapstartdate
+    # NOTE this is the fix for the weatherdata issue.
+    laps["LapStartDate"] = session.date + laps["Time"] - laps["LapTime"]
 
     # ── Extract location ──────────────────────────────────────
     location = ""
