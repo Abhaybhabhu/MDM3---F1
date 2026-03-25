@@ -1,6 +1,6 @@
-# F1 Tyre Degradation — Cliff Onset Modelling
+# Feature-engineered predictions
 
-A physics-based model for predicting the onset of tyre performance degradation ("the cliff") in Formula 1, built on publicly available telemetry data via the FastF1 API.
+A physics-based model for predicting lap times based off engineered features, built on publicly available telemetry data via the FastF1 API.
 
 This is a 10-credit group project for third-year EngMaths students at University of Bristol.
 
@@ -8,7 +8,7 @@ This is a 10-credit group project for third-year EngMaths students at University
 
 ## Research Question
 
-Can a physics-based model of tyre degradation predict the onset time of the performance cliff in Formula 1?
+Can a physics-based model of features aid in neural network's prediction of lap time, and how can we use it to aid strategic decisions?
 
 ---
 
@@ -16,7 +16,7 @@ Can a physics-based model of tyre degradation predict the onset time of the perf
 | Section | Description |
 |---|---|
 | [Research Question](#research-question) | What we're trying to answer |
-| [Model Overview](#model-overview) | ODE system and Magic Formula |
+| [Model Overview](#model-overview) | ODE system |
 | [Repository Structure](#repository-structure) | Folder layout |
 | [Setup](#setup) | Installation and data regeneration |
 | [Dependencies](#dependencies) | Key packages |
