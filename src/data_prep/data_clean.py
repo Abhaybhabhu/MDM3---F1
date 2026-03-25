@@ -549,6 +549,7 @@ def filter_laps(laps: pd.DataFrame) -> pd.DataFrame:
 def compute_gap_to_car_ahead(
     laps: pd.DataFrame,
     circuit_length_m: float,
+    verbose: bool = False
 ) -> pd.DataFrame:
     """
     Compute the time gap to the car immediately ahead on track.
@@ -609,6 +610,11 @@ def compute_gap_to_car_ahead(
 
         method = "LapStartDate"
 
+    # print out some stats about the gap feature to verify it looks reasonable
+    if verbose:
+        gap_stats = laps["GapToCarAhead"].describe()
+        print(f"      pre-na filling GapToCarAhead stats:\n{gap_stats}")
+
     # ── Post-processing ───────────────────────────────────────
     laps["GapToCarAhead"] = laps["GapToCarAhead"].fillna(10.0)
     laps.loc[
@@ -617,6 +623,10 @@ def compute_gap_to_car_ahead(
     laps["GapToCarAhead"] = laps["GapToCarAhead"].clip(
         0.0, 10.0
     )
+    if verbose:
+        # print distribution stats for the gap feature to verify it looks reasonable
+        gap_stats = laps["GapToCarAhead"].describe()
+        print(f"       GapToCarAhead stats:\n{gap_stats}")
 
     print(f"       Gap method: {method}")
     return laps
@@ -633,6 +643,7 @@ def engineer_features(
     total_laps: int,
     year: int,
     event_name: str,
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """
     Engineer all features required by the CatBoost pace model.
@@ -668,6 +679,10 @@ def engineer_features(
     pd.DataFrame
         Feature-rich DataFrame ready for model training.
     """
+
+    if verbose:
+        print(f"     Engineering features for {location}...")
+
     laps = laps.copy()
     circuit_length_km, num_corners = get_circuit_meta(location)
     circuit_length_m = circuit_length_km * 1000
@@ -703,14 +718,24 @@ def engineer_features(
 
     laps["RaceLapNumber"] = laps["LapNumber"].astype(int)
 
-    laps = compute_gap_to_car_ahead(laps, circuit_length_m)
+    laps = compute_gap_to_car_ahead(laps, circuit_length_m, verbose=verbose)
 
     laps["DRS_Available"] = 0
     drs_mask = (
-        (laps["GapToCarAhead"] <= 1.0)
+        (laps["GapToCarAhead"] <= 10.0)
         & (laps["LapNumber"] > 2)
     )
     laps.loc[drs_mask, "DRS_Available"] = 1
+    if verbose:
+        available_pct = laps["DRS_Available"].mean() * 100
+        print(
+            f"       DRS Available: {available_pct:.1f}% of laps"
+        )
+        # print the if the mask is working correctly by showing some examples
+        print(
+            f"       DRS Available examples:\n"
+            f"{laps[drs_mask][['LapNumber', 'GapToCarAhead', 'DRS_Available']].head(10)}"
+        )
 
     # ══════════════════════════════════════════════════════════
     # D) WEATHER FEATURES
@@ -815,6 +840,8 @@ def process_session(
     year: int,
     event_name: str,
     round_number: int,
+    verbose: bool = False
+
 ) -> Optional[pd.DataFrame]:
     """
     Load, filter, and feature-engineer a single race session.
@@ -951,6 +978,7 @@ def process_session(
         total_laps=total_laps,
         year=year,
         event_name=event_name,
+        verbose=verbose,
     )
 
     # ── Select only output columns ────────────────────────────
@@ -1086,6 +1114,7 @@ def select_and_clean(df: pd.DataFrame) -> pd.DataFrame:
 def build_dataset(
     seasons: Optional[List[int]] = None,
     output_path: str = "training_data",
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """
     Run the complete data pipeline across all specified seasons.
@@ -1199,7 +1228,7 @@ def build_dataset(
             # ── Process from API if not cached ────────────────
             if result is None:
                 result = process_session(
-                    year, event_name, round_number
+                    year, event_name, round_number, verbose=verbose
                 )
 
                 # Cache successfully processed races
@@ -1333,6 +1362,7 @@ if __name__ == "__main__":
     print(f"\n{'=' * 60}")
     print(f"  SANITY CHECKS")
     print(f"{'=' * 60}")
+
 
     # No wet compounds
     wet_leaks = df["Compound"].isin(WET_COMPOUNDS).sum()
