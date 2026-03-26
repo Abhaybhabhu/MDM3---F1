@@ -682,7 +682,7 @@ def engineer_features(
 
     if verbose:
         print(f"{laps[['LapStartDate']].head()=}")  # print first few rows to verify LapTimeSec and GapToCarAhead look correct
-
+        print(f" {laps.columns=}")  # print columns to verify expected columns are present before engineering
     if verbose:
         print(f"     Engineering features for {location}...")
 
@@ -725,7 +725,7 @@ def engineer_features(
 
     laps["DRS_Available"] = 0
     drs_mask = (
-        (laps["GapToCarAhead"] <= 10.0)
+        (laps["GapToCarAhead"] <= 1.0)
         & (laps["LapNumber"] > 2)
     )
     laps.loc[drs_mask, "DRS_Available"] = 1

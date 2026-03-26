@@ -79,9 +79,9 @@ def debug_first_race_per_season(years, verbose=True):
 if __name__ == "__main__":
     years = [2024]
     # run this for looking at the drs data
-    #debug_first_race_per_season(years, verbose=True)
+    debug_first_race_per_season(years, verbose=True)
 
     # now going to look at the weather data.
-    build_dataset(years, verbose=True)
+    #build_dataset(years, verbose=True)
     # currently getting the output Weather: merge failed (Merge keys contain null values on left side), using NaNs for weather data.
     
