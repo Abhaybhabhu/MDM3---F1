@@ -14,7 +14,7 @@ MIN_STINT_LAPS = 5
 
 DRY_COMPOUNDS = ["SOFT", "MEDIUM", "HARD"]
 
-SAVE_DATA = False # flag for if you want to overwrite the CSV files. 
+SAVE_DATA = True # flag for if you want to overwrite the CSV files. 
 # Going to set it to False while I test the drs addition.
 
 print("Script folder:", BASE_DIR)
