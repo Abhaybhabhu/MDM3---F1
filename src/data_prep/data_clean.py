@@ -45,6 +45,19 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # 1. CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
 
+from pathlib import Path
+
+# Get the directory of this script
+BASE_DIR = Path(__file__).resolve().parent
+
+# Go up two levels to /root
+ROOT_DIR = BASE_DIR.parents[1]
+
+# Construct path to processed folder
+OUTPUT_PATH = ROOT_DIR / "data" / "processed" / "training_data" 
+
+print(f"Output path: {OUTPUT_PATH}")
+
 SEASONS = [2022, 2023, 2024, 2025]
 
 # FastF1 cache directory — avoids re-downloading data
@@ -1320,6 +1333,10 @@ def build_dataset(
     parquet_path = f"{output_path}.parquet"
     dataset.to_parquet(parquet_path, index=False)
     print(f"\n  Saved to: {parquet_path}")
+    # also going to save to a csv for easier inspection. 
+    csv_path = f"{output_path}.csv"
+    dataset.to_csv(csv_path, index=False)
+    print(f"  Also saved to: {csv_path}")
 
     # ── Summary Statistics ────────────────────────────────────
     print(f"\n{'=' * 60}")
@@ -1382,7 +1399,7 @@ if __name__ == "__main__":
 
     df = build_dataset(
         seasons=SEASONS,
-        output_path="../../data/processed/training_data",
+        output_path=OUTPUT_PATH
     )
 
     # ── Sanity Checks ─────────────────────────────────────────
