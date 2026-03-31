@@ -457,11 +457,10 @@ def add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
                 df.loc[idx, scaled] = 0.0
     
     # weighted sliding proxy
-    df["SlidingProxy"] = (
-        LAMBDA_BRAKE * df["BrakeIntensity"]
-        + LAMBDA_ACCEL * df["AccelIntensity"]
-        + LAMBDA_CORNER * df["CorneringSeverity"]
-    )
+    A = LAMBDA_BRAKE * df["BrakeIntensity"]
+    B = LAMBDA_ACCEL * df["AccelIntensity"] # is this throttle?
+    C = LAMBDA_CORNER * df["CorneringSeverity"]
+    df["SlidingProxy"] = C * (A+B)
     
     # vertical load
     df["Fz_N"] = VEHICLE_MASS_KG * G + K_AERO * (df["MeanSpeed_ms"] ** 2)
