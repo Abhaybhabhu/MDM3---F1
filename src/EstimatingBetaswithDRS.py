@@ -7,7 +7,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 CSV_PATH = BASE_DIR / "data" / "processed" / "training_data.csv"
 
-BASELINE_SOFT_BETA = 1.2e-9
+BASELINE_SOFT_BETA = 1.2e-8
 MIN_RATIO_MEDIUM = 0.20
 MIN_RATIO_HARD = 0.10
 MIN_STINT_LAPS = 5

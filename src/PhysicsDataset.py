@@ -22,6 +22,7 @@ warnings.filterwarnings("ignore", module="fastf1")
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 SEASONS = [2022, 2023, 2024, 2025]
+test_seasons = [2022]
 SESSION_TYPE = "R"
 CACHE_DIR = "fastf1_cache"
 OUTPUT_RAW_CSV = "physics_raw_2022_2025.csv"
@@ -40,7 +41,7 @@ K_AERO = (VEHICLE_MASS_KG * G) / (V_REF_MS ** 2)
 
 A_TEMP = 1e-5       # calibrated heating coefficient
 B_COOL = 0.005      # calibrated cooling coefficient
-T_OPT_C = 100.0     # optimal tyre temperature
+T_OPT_C = 90.0     # optimal tyre temperature NOTE : another change during debugging.
 P_CURV = 2           # thermal penalty curvature
 LAMBDA_TEMP = 5e-4   # thermal penalty strength
 T_START_OFFSET = 15.0  # initial tyre temp = T_env + offset
@@ -48,8 +49,11 @@ DEFAULT_AMBIENT_C = 25.0
 W_AIR = 0.4          # weight for air temp in T_env
 W_TRACK = 0.6        # weight for track temp in T_env
 
+V_SLIP_SCALE = 20
+V_S_MAX = 2.25  # m/s equivalent
+
 # DRS-corrected beta ratios (from EstimatingBetaswithDRS.py)
-BETA_SOFT = 1.2e-9
+BETA_SOFT = 1.2e-8
 BETA_MAP = {
     "SOFT": BETA_SOFT * 1.0,      # baseline
     "MEDIUM": BETA_SOFT * 0.3628,  # data-driven
@@ -460,7 +464,9 @@ def add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
     A = LAMBDA_BRAKE * df["BrakeIntensity"]
     B = LAMBDA_ACCEL * df["AccelIntensity"] # is this throttle?
     C = LAMBDA_CORNER * df["CorneringSeverity"]
-    df["SlidingProxy"] = C * (A+B)
+    # NOTE: mutpliying this by ten to get it in a more reasonable range for the thermal model, since cornering severity is often quite low..
+    df["SlidingProxy"] = V_SLIP_SCALE*C * (A+B) 
+    # Justification is that our proxy for slip is rough and this prevents it from being too unrealistic at high values..
     
     # vertical load
     df["Fz_N"] = VEHICLE_MASS_KG * G + K_AERO * (df["MeanSpeed_ms"] ** 2)
@@ -510,9 +516,11 @@ def add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
             
             psi_T = 1.0 + LAMBDA_TEMP * max(0.0, T_state - T_OPT_C) ** P_CURV
             psi_vals[row_idx] = psi_T
+
+            vs_eff = V_S_MAX * np.tanh(vs / V_S_MAX)
             
             # Temperature update
-            dTdt = A_TEMP * Fz * vs - B_COOL * (T_state - T_env)
+            dTdt = A_TEMP * Fz * vs_eff - B_COOL * (T_state - T_env)
             T_state = T_state + dt * dTdt
             
             # Exponential tyre health decay
@@ -532,7 +540,7 @@ def main():
     all_frames: List[pd.DataFrame] = []
     saved = []
     failed = []
-    
+    # NOTE : changed this for testing.
     for year in SEASONS:
         print(f"\n{'='*60}")
         print(f"  SEASON {year}")
@@ -542,7 +550,9 @@ def main():
         except Exception as e:
             print(f"Could not load schedule: {e}")
             continue
-        
+
+        # NOTE: only doing the first few races for testing.
+
         for _, event_row in schedule.iterrows():
             event_name = str(event_row.get("EventName", "Unknown"))
             rnd = event_row.get("RoundNumber", np.nan)
