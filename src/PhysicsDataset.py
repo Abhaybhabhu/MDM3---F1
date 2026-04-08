@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore", module="fastf1")
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 SEASONS = [2022, 2023, 2024, 2025]
-test_seasons = [2022]
+test_seasons = [2024]
 SESSION_TYPE = "R"
 CACHE_DIR = "fastf1_cache"
 OUTPUT_RAW_CSV = "physics_raw_2022_2025.csv"
@@ -161,13 +161,25 @@ def get_circuit_length_km(location: str) -> float:
 
 
 # TELEMETRY EXTRACTION (per lap, fully defensive)
-def extract_lap_telemetry(lap) -> Optional[Dict]:
+def extract_lap_telemetry(lap, verbose:bool=False) -> Optional[Dict]:
     try:
         tel = lap.get_car_data()
-    except Exception:
+    except Exception as e:
+        if verbose:
+            print(f"    Failed to extract car data telemetry, Error: {e}")
+            # print lap data for debugging
+            try:               
+                #print(f"    Lap data: {lap}")
+                print(f"{type(lap)=}, {hasattr(lap, 'get_car_data')=}")
+                # print if lap is nonetype
+                #print(f"    Lap is None: {lap is None}")
+                print(f" Lap.session is None: {lap.session is None}")
+            except Exception:                pass
         return None
     
     if tel is None or tel.empty:
+        if verbose:
+            print(f"   WARNING: Telemetry data returned is empty")
         return None
     
     if not all(c in tel.columns for c in ["Speed", "Throttle", "Brake"]):
@@ -211,12 +223,14 @@ def extract_lap_telemetry(lap) -> Optional[Dict]:
             "DRSActiveFraction": drs_active_frac,
             "DRSDetected": int(drs_detected),
         }
-    except Exception:
+    except Exception as e:
+        if verbose:
+            print(f"    Failed to extract telemetry for lap Error: {e}")
         return None
 
 
 # WEATHER MERGE 
-def get_weather_for_laps(laps_df: pd.DataFrame, session) -> pd.DataFrame:
+def get_weather_for_laps(laps_df: pd.DataFrame, session, verbose:bool = False) -> pd.DataFrame:
     out = laps_df.copy()
     weather_cols = ["AirTemp", "TrackTemp", "Humidity", "WindSpeed"]
     
@@ -227,13 +241,19 @@ def get_weather_for_laps(laps_df: pd.DataFrame, session) -> pd.DataFrame:
     try:
         weather = session.weather_data
         if weather is None or weather.empty:
+            if verbose:
+                print("weather is None or empty. Returning out")
             return out
         
         use_cols = [c for c in weather_cols if c in weather.columns]
         if not use_cols or "Time" not in weather.columns:
+            if verbose:
+                print("columns missing. Returning out")
             return out
         
         if "LapStartDate" not in out.columns or out["LapStartDate"].isna().all():
+            if verbose:
+                print("columns missing or lapstartdate isna(). Returning out")
             return out
         
         wx = weather.copy()
@@ -242,9 +262,12 @@ def get_weather_for_laps(laps_df: pd.DataFrame, session) -> pd.DataFrame:
         else:
             wx["_t"] = pd.to_datetime(wx["Time"])
         
-        out_sorted = out.sort_values("LapStartDate").copy()
+        out_sorted = out.copy()
+        out_sorted["_orig_row"] = np.arange(len(out_sorted))
+        out_sorted = out_sorted.sort_values("LapStartDate").copy()
         wx_sorted = wx.sort_values("_t")
-        
+        if verbose:
+            print("starting merge on weather data.")
         merged = pd.merge_asof(
             out_sorted,
             wx_sorted[["_t"] + use_cols].drop_duplicates(subset=["_t"]),
@@ -260,14 +283,18 @@ def get_weather_for_laps(laps_df: pd.DataFrame, session) -> pd.DataFrame:
             if wx_col in merged.columns:
                 merged[col] = merged[wx_col].combine_first(merged.get(col, pd.Series(dtype=float)))
                 merged = merged.drop(columns=[wx_col])
+        merged = merged.sort_values("_orig_row").drop(columns=["_orig_row"], errors="ignore")
         
-        return merged
-    except Exception:
+        
+    except Exception as e:
+        if verbose:
+            print(f"    Failed to merge weather data in get_weather_for_laps: Error: {e}")
         return out
+    return merged
 
 
 # STAGE 1: PROCESS ONE RACE
-def process_race(year: int, event_row: pd.Series) -> Optional[pd.DataFrame]:
+def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Optional[pd.DataFrame]:
     round_number = int(event_row["RoundNumber"])
     event_name = str(event_row["EventName"])
     location = get_location(event_row)
@@ -281,7 +308,8 @@ def process_race(year: int, event_row: pd.Series) -> Optional[pd.DataFrame]:
         session = fastf1.get_session(year, round_number, SESSION_TYPE)
         session.load(laps=True, telemetry=True, weather=True, messages=False)
     except Exception as e:
-        print(f"    Session load failed: {e}")
+        if verbose:
+            print(f"    Session load failed: {e}")
         return None
     
     if is_wet_race(session, year, event_name):
@@ -294,30 +322,47 @@ def process_race(year: int, event_row: pd.Series) -> Optional[pd.DataFrame]:
             print("    No lap data available")
             return None
     except Exception as e:
-        print(f"    Cannot access laps: {e}")
+        if verbose:
+            print(f"    Cannot access laps: {e}")
         return None
-    
     try:
-        all_laps = get_weather_for_laps(all_laps, session)
-    except Exception:
-        pass
+        print("GETTING WEATHER DATA..")
+        
+        laps_weather = get_weather_for_laps(all_laps, session, verbose=False)
+    except Exception as e:
+        if verbose:
+            print(f"    Failed to merge weather data in process race: {e}")
+        laps_weather = None
     
+
+
     rows = []
     ok_count = 0
     fail_count = 0
     skip_count = 0
     total = len(all_laps)
-    
+    # add telemetry data..
+    print(f"    Processing {total} laps...")
     for i in range(total):
         try:
             lap = all_laps.iloc[i]
-        except Exception:
+        except Exception as e:
             fail_count += 1
+            if verbose:
+                print(f"    Failed to access lap data for lap index {i}: {e}")
             continue
+        
+        if laps_weather is not None and len(laps_weather) == total:
+            lap_weather = laps_weather.iloc[i]
+        else:
+            lap_weather = lap
         
         try:
             lap_number = int(lap["LapNumber"]) if pd.notna(lap.get("LapNumber")) else -1
-        except Exception:
+        except Exception as e:
+            # print out what the exception is, and the lap data that caused it, for debugging.
+            if verbose:
+                print(f"    Failed to parse lap number for lap index {i}: {e}")
             fail_count += 1
             continue
         
@@ -327,16 +372,22 @@ def process_race(year: int, event_row: pd.Series) -> Optional[pd.DataFrame]:
         
         lap_time = lap.get("LapTime", pd.NaT)
         if pd.isna(lap_time):
+            if verbose:
+                print(f"    Lap time is NaT for lap index {i}, skipping")
             skip_count += 1
             continue
         
         try:
             lap_time_s = float(lap_time.total_seconds())
-        except Exception:
+        except Exception as e:
+            if verbose:
+                print(f"    Failed to parse lap time for lap index {i}: {e}")
             skip_count += 1
             continue
         
         if lap_time_s <= 0 or lap_time_s > 300:
+            if verbose:
+                print(f"    Lap time is out of bounds for lap index {i}: {lap_time_s}")
             skip_count += 1
             continue
         
@@ -344,21 +395,29 @@ def process_race(year: int, event_row: pd.Series) -> Optional[pd.DataFrame]:
         pit_out = lap.get("PitOutTime", pd.NaT)
         if pd.notna(pit_in) or pd.notna(pit_out):
             skip_count += 1
+            if verbose:
+                print(f"    Lap has pit in/out for lap index {i}")
             continue
         
         compound = str(lap.get("Compound", "")).upper().strip()
         if compound not in DRY_COMPOUNDS:
             skip_count += 1
+            if verbose:
+                print(f"    Compound is not dry for lap index {i}")
             continue
         
         driver = str(lap.get("Driver", "")).strip()
         if not driver:
             skip_count += 1
+            if verbose:
+                print(f"    Missing driver name for lap index {i}")
             continue
         
-        tel_features = extract_lap_telemetry(lap)
+        tel_features = extract_lap_telemetry(lap, verbose=verbose)
         if tel_features is None:
             fail_count += 1
+            if verbose:
+                print(f"    Failed to extract telemetry for lap index {i}")
             continue
         
         tire_age = 0
@@ -368,7 +427,9 @@ def process_race(year: int, event_row: pd.Series) -> Optional[pd.DataFrame]:
                 try:
                     tire_age = int(val)
                     break
-                except Exception:
+                except Exception as e:
+                    if verbose:
+                        print(f"    Failed to parse tire age for lap index {i}: {e}")
                     pass
         
         stint = np.nan
@@ -376,7 +437,9 @@ def process_race(year: int, event_row: pd.Series) -> Optional[pd.DataFrame]:
         if pd.notna(val):
             try:
                 stint = int(val)
-            except Exception:
+            except Exception as e:
+                if verbose:
+                    print(f"    Failed to parse stint for lap index {i}: {e}")
                 pass
         
         row = {
@@ -392,10 +455,10 @@ def process_race(year: int, event_row: pd.Series) -> Optional[pd.DataFrame]:
             "Compound": compound,
             "TireAge": tire_age,
             "LapTime_s": lap_time_s,
-            "AirTemp": pd.to_numeric(lap.get("AirTemp", np.nan), errors="coerce"),
-            "TrackTemp": pd.to_numeric(lap.get("TrackTemp", np.nan), errors="coerce"),
-            "Humidity": pd.to_numeric(lap.get("Humidity", np.nan), errors="coerce"),
-            "WindSpeed": pd.to_numeric(lap.get("WindSpeed", np.nan), errors="coerce"),
+            "AirTemp": pd.to_numeric(lap_weather.get("AirTemp", np.nan), errors="coerce"),
+            "TrackTemp": pd.to_numeric(lap_weather.get("TrackTemp", np.nan), errors="coerce"),
+            "Humidity": pd.to_numeric(lap_weather.get("Humidity", np.nan), errors="coerce"),
+            "WindSpeed": pd.to_numeric(lap_weather.get("WindSpeed", np.nan), errors="coerce"),
         }
         row.update(tel_features)
         rows.append(row)
@@ -541,12 +604,12 @@ def main():
     saved = []
     failed = []
     # NOTE : changed this for testing.
-    for year in SEASONS:
+    for year in test_seasons:
         print(f"\n{'='*60}")
         print(f"  SEASON {year}")
         print(f"{'='*60}")
         try:
-            schedule = fastf1.get_event_schedule(year)
+            schedule = fastf1.get_event_schedule(year)[:15] # limit the first ten rounds until we figure out the problem.
         except Exception as e:
             print(f"Could not load schedule: {e}")
             continue
@@ -564,7 +627,7 @@ def main():
                 continue
             
             try:
-                race_df = process_race(year, event_row)
+                race_df = process_race(year, event_row, verbose=False)
             except Exception as e:
                 print(f"  Crashed on {event_name}: {e}")
                 race_df = None
@@ -597,6 +660,13 @@ def main():
     print(f"Mean speed:   {raw_df['MeanSpeed_ms'].mean():.2f} m/s")
     
     # ---- STAGE 2: Add physics model features ----
+
+    print("weather data:")
+    print(f"  AirTemp: {raw_df['AirTemp'].mean():.2f} C")
+    print(f"  TrackTemp: {raw_df['TrackTemp'].mean():.2f} C")
+    print(f"  Humidity: {raw_df['Humidity'].mean():.2f} %")
+    print(f"  WindSpeed: {raw_df['WindSpeed'].mean():.2f} m/s")
+
     print(f"\n{'='*60}")
     print(f"  STAGE 2: Adding Physics Model")
     print(f"{'='*60}")
@@ -619,7 +689,7 @@ def main():
             print(f"  {comp}: mean={sub['TyreHealth'].mean():.4f}  min={sub['TyreHealth'].min():.4f}  n={len(sub):,}")
     
     print("\nRaces per season:")
-    for year in SEASONS:
+    for year in test_seasons:
         sub = modelled_df[modelled_df["Season"] == year]
         if len(sub) > 0:
             print(f"  {year}: {sub['RaceID'].nunique()} races, {len(sub):,} rows")
