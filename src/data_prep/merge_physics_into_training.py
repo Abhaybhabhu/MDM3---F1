@@ -35,10 +35,12 @@ import numpy as np
 import re
 from pathlib import Path
 
-PARQUET_PATH = "training_data.parquet"
-PHYSICS_PATH = "physics_modelled_2022_2025.csv"
-OUTPUT_PARQUET = "training_data_with_physics.parquet"
-OUTPUT_CSV = "training_data_with_physics.csv"
+BASE_DIR = Path(__file__).resolve().parents[2]
+PARQUET_PATH = BASE_DIR / "data" / "processed" / "training_data.parquet"
+PHYSICS_PATH = BASE_DIR / "data" / "processed" / "physics_modelled_2022_2025.csv"
+OUTPUT_PARQUET = BASE_DIR / "data" / "processed" / "training_data_with_physics.parquet"
+OUTPUT_CSV = BASE_DIR / "data" / "processed" / "training_data_with_physics.csv"
+
 
 # Physics columns to merge
 PHYSICS_COLS = [
@@ -123,12 +125,16 @@ def main():
     
     # ── Load datasets ─────────────────────────────────────────
     print(f"\nLoading parquet: {PARQUET_PATH}")
+    if not PARQUET_PATH.exists():
+        raise FileNotFoundError(f"Missing input parquet: {PARQUET_PATH}")
     parquet_df = pd.read_parquet(PARQUET_PATH)
     print(f"  Rows: {len(parquet_df):,}")
     print(f"  Races: {parquet_df['RaceID'].nunique()}")
     print(f"  Columns: {len(parquet_df.columns)}")
     
     print(f"\nLoading physics: {PHYSICS_PATH}")
+    if not PHYSICS_PATH.exists():
+        raise FileNotFoundError(f"Missing physics input CSV: {PHYSICS_PATH}")
     physics_df = pd.read_csv(PHYSICS_PATH)
     print(f"  Rows: {len(physics_df):,}")
     print(f"  Races: {physics_df['RaceID'].nunique()}")
