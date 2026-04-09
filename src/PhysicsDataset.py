@@ -325,6 +325,7 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
         if verbose:
             print(f"    Cannot access laps: {e}")
         return None
+    '''
     try:
         print("GETTING WEATHER DATA..")
         
@@ -333,6 +334,7 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
         if verbose:
             print(f"    Failed to merge weather data in process race: {e}")
         laps_weather = None
+        '''
     
 
 
@@ -351,11 +353,12 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
             if verbose:
                 print(f"    Failed to access lap data for lap index {i}: {e}")
             continue
-        
+        '''
         if laps_weather is not None and len(laps_weather) == total:
             lap_weather = laps_weather.iloc[i]
         else:
             lap_weather = lap
+            '''
         
         try:
             lap_number = int(lap["LapNumber"]) if pd.notna(lap.get("LapNumber")) else -1
@@ -454,11 +457,7 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
             "Stint": stint,
             "Compound": compound,
             "TireAge": tire_age,
-            "LapTime_s": lap_time_s,
-            "AirTemp": pd.to_numeric(lap_weather.get("AirTemp", np.nan), errors="coerce"),
-            "TrackTemp": pd.to_numeric(lap_weather.get("TrackTemp", np.nan), errors="coerce"),
-            "Humidity": pd.to_numeric(lap_weather.get("Humidity", np.nan), errors="coerce"),
-            "WindSpeed": pd.to_numeric(lap_weather.get("WindSpeed", np.nan), errors="coerce"),
+            "LapTime_s": lap_time_s
         }
         row.update(tel_features)
         rows.append(row)
@@ -535,8 +534,9 @@ def add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
     df["Fz_N"] = VEHICLE_MASS_KG * G + K_AERO * (df["MeanSpeed_ms"] ** 2)
     
     # --- Environmental temperature ---
-    air = pd.to_numeric(df["AirTemp"], errors="coerce")
-    track = pd.to_numeric(df["TrackTemp"], errors="coerce")
+    '''
+    #air = pd.to_numeric(df["AirTemp"], errors="coerce")
+    #track = pd.to_numeric(df["TrackTemp"], errors="coerce")
     
     df["T_env_C"] = DEFAULT_AMBIENT_C
     both = air.notna() & track.notna()
@@ -545,6 +545,7 @@ def add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[both, "T_env_C"] = W_AIR * air[both] + W_TRACK * track[both]
     df.loc[air_only, "T_env_C"] = air[air_only]
     df.loc[track_only, "T_env_C"] = track[track_only]
+    '''
     
     # DRS availability
     if "DRSDetected" in df.columns:
@@ -562,7 +563,7 @@ def add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
     for (race_id, driver, stint), group in df.groupby(["RaceID", "Driver", "Stint"], sort=False):
         idx = group.index.tolist()
         
-        T_env_start = float(df.at[idx[0], "T_env_C"])
+        T_env_start = DEFAULT_AMBIENT_C
         T_state = T_env_start + T_START_OFFSET
         q_state = 1.0
         
@@ -571,7 +572,7 @@ def add_physics_features(df: pd.DataFrame) -> pd.DataFrame:
             dt = float(row["LapTime_s"])
             Fz = float(row["Fz_N"])
             vs = float(row["SlidingProxy"])
-            T_env = float(row["T_env_C"])
+            T_env = T_env_start  # could be enhanced with actual weather data if available.
             beta_c = BETA_MAP.get(row["Compound"], BETA_SOFT)
             
             T_vals[row_idx] = T_state
@@ -604,12 +605,12 @@ def main():
     saved = []
     failed = []
     # NOTE : changed this for testing.
-    for year in test_seasons:
+    for year in SEASONS:
         print(f"\n{'='*60}")
         print(f"  SEASON {year}")
         print(f"{'='*60}")
         try:
-            schedule = fastf1.get_event_schedule(year)[:15] # limit the first ten rounds until we figure out the problem.
+            schedule = fastf1.get_event_schedule(year)
         except Exception as e:
             print(f"Could not load schedule: {e}")
             continue
@@ -661,12 +662,6 @@ def main():
     
     # ---- STAGE 2: Add physics model features ----
 
-    print("weather data:")
-    print(f"  AirTemp: {raw_df['AirTemp'].mean():.2f} C")
-    print(f"  TrackTemp: {raw_df['TrackTemp'].mean():.2f} C")
-    print(f"  Humidity: {raw_df['Humidity'].mean():.2f} %")
-    print(f"  WindSpeed: {raw_df['WindSpeed'].mean():.2f} m/s")
-
     print(f"\n{'='*60}")
     print(f"  STAGE 2: Adding Physics Model")
     print(f"{'='*60}")
@@ -689,7 +684,7 @@ def main():
             print(f"  {comp}: mean={sub['TyreHealth'].mean():.4f}  min={sub['TyreHealth'].min():.4f}  n={len(sub):,}")
     
     print("\nRaces per season:")
-    for year in test_seasons:
+    for year in SEASONS:
         sub = modelled_df[modelled_df["Season"] == year]
         if len(sub) > 0:
             print(f"  {year}: {sub['RaceID'].nunique()} races, {len(sub):,} rows")
