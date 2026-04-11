@@ -1,0 +1,261 @@
+ Detecting GPU availability…
+   GPU 0: NVIDIA RTX PRO 6000 Blackwell Server Edition, 97887 MiB
+    GPU training verified
+  F1 Virtual Race Strategist — Pace Model V3
+   Input:    training_data_v3.parquet
+   Output:   models/pace_model.cbm
+   Target:   LapTimeDelta
+   Baseline: track_season
+   Device:   GPU
+   Features: strategy + projectable physics
+
+
+ Loading data from: training_data_v3.parquet
+   Rows: 57,754
+   Columns: 20
+
+   Feature availability:
+     Strategy (cat):  ['Compound', 'TrackName', 'Driver', 'Team']
+     Strategy (num):  ['StintNumber', 'RaceLapNumber', 'RaceLapFraction']
+     Physics:         ['TyreHealth', 'Fz_N', 'TyreTemp_C']
+
+   Raw target (LapTimeSec):
+     Mean:  88.97s  Std: 9.66s
+     Range: 67.92s – 140.24s
+   Groups (RaceID): 61 races
+
+ Computing per-track baselines (mode: track_season)…
+   Baseline groups: 61 (track × season)
+   Seasons: 4
+   Global median: 87.21s
+
+   Delta target (LapTimeDelta):
+     Mean:  0.03s  Std: 1.50s
+     Range: -5.31s – 45.46s
+
+   Baselines (61 groups):
+     Austin_2022                          103.18s
+     Baku_2022                            109.68s
+     Baku_2024                            108.89s
+     Baku_2025                            105.93s
+     Barcelona_2022                        88.80s
+     Barcelona_2023                        80.18s
+     Barcelona_2024                        80.67s
+     Barcelona_2025                        81.04s
+     Budapest_2023                         84.57s
+     Budapest_2024                         84.38s
+     … and 51 more
+
+ Outlier filtering:
+   Effective: [-4.05s, +3.95s]
+   Removed: 347 laps (0.6%)
+   Remaining: 57,407 laps
+   New delta std: 1.24s
+
+ Feature matrix: (57407, 10)
+   Target: LapTimeDelta
+   Categorical (4): ['Compound', 'TrackName', 'Driver', 'Team']
+   Strategy num (3): ['StintNumber', 'RaceLapNumber', 'RaceLapFraction']
+   Physics (3): ['TyreHealth', 'Fz_N', 'TyreTemp_C']
+   Physics NaN: 0.0%
+   Device: GPU
+
+═════════════════════════════════════════════════════════════════
+  HYPERPARAMETER TUNING (35 trials)
+═════════════════════════════════════════════════════════════════
+  Device:          GPU 🚀
+  Max fits:        105
+  Train subsample: 100%
+  Iter cap:        2500
+  Early stop:      80
+  Features:        10
+═════════════════════════════════════════════════════════════════
+Best trial: 21. Best value: 0.800905: 100%
+ 35/35 [10:50<00:00, 11.33s/it]
+
+   Best RMSE:   0.8009s
+   Time:        650.8s (10.8 min)
+   Trials:       13 complete, 22 pruned
+   Fold fits:    66 (vs 105 max)
+  Best parameters:
+    bagging_temperature: 1.8567689902884112
+    depth: 8
+    iterations: 1996
+    l2_leaf_reg: 12.597387008052221
+    learning_rate: 0.023434119141983043
+    min_data_in_leaf: 100
+    random_strength: 0.5285383334429251
+
+═════════════════════════════════════════════════════════════════
+  CROSS-VALIDATION (3-Fold GroupKFold)
+  Device: GPU 
+  Target: LapTimeDelta
+  Features: 10
+═════════════════════════════════════════════════════════════════
+
+── Fold 1/3 ──
+   Train: 38,459 | Test: 18,948 (20 races)
+   Delta RMSE: 0.8053s | MAE: 0.6028s | R²: 0.5840
+   Abs   RMSE: 0.8053s
+    19.0s | best_iter: 542
+     HARD    : RMSE=0.8087s (10394 laps)
+     MEDIUM  : RMSE=0.7929s (6526 laps)
+     SOFT    : RMSE=0.8272s (2028 laps)
+
+── Fold 2/3 ──
+   Train: 38,457 | Test: 18,950 (20 races)
+   Delta RMSE: 0.7477s | MAE: 0.5727s | R²: 0.6274
+   Abs   RMSE: 0.7477s
+    15.1s | best_iter: 419
+     HARD    : RMSE=0.7443s (9741 laps)
+     MEDIUM  : RMSE=0.7591s (6369 laps)
+     SOFT    : RMSE=0.7337s (2840 laps)
+
+── Fold 3/3 ──
+   Train: 37,898 | Test: 19,509 (21 races)
+   Delta RMSE: 0.8497s | MAE: 0.6430s | R²: 0.5255
+   Abs   RMSE: 0.8497s
+   15.7s | best_iter: 426
+     HARD    : RMSE=0.8474s (10706 laps)
+     MEDIUM  : RMSE=0.8459s (7056 laps)
+     SOFT    : RMSE=0.8783s (1747 laps)
+
+═════════════════════════════════════════════════════════════════
+  CV RESULTS (GPU)
+═════════════════════════════════════════════════════════════════
+  Delta RMSE: 0.8009s ± 0.0417s
+  Delta MAE:  0.6062s
+  Delta R²:   0.5790
+  Abs   RMSE: 0.8009s
+  Avg best_iter: 462
+  CV time:    49.9s
+═════════════════════════════════════════════════════════════════
+
+   Adaptive iterations: 1996 → 489 (CV best: [542, 419, 426])
+
+═════════════════════════════════════════════════════════════════
+  TRAINING FINAL MODEL
+═════════════════════════════════════════════════════════════════
+  Training on 57,407 laps (all data)
+  Features: 10
+  Target: LapTimeDelta
+  Device: CPU (required for virtual ensembles)
+    GPU was used for CV & tuning
+  Parameters:
+    bagging_temperature: 1.8567689902884112
+    depth: 8
+    iterations: 489
+    l2_leaf_reg: 12.597387008052221
+    langevin: True
+    learning_rate: 0.023434119141983043
+    loss_function: RMSE
+    min_data_in_leaf: 100
+    posterior_sampling: True
+    random_seed: 42
+    random_strength: 0.5285383334429251
+    task_type: CPU
+0:	learn: 1.2204899	total: 8.74ms	remaining: 4.26s
+200:	learn: 0.6908167	total: 1.57s	remaining: 2.25s
+400:	learn: 0.6225374	total: 3.29s	remaining: 722ms
+488:	learn: 0.6010941	total: 4.01s	remaining: 0us
+
+  Train RMSE: 0.5906s | R²: 0.7716
+   Model saved to: models/pace_model.cbm
+    Training time: 4.1s (0.1 min)
+   Baselines saved to: models/track_baselines.json
+
+═════════════════════════════════════════════════════════════════
+  FEATURE IMPORTANCE
+═════════════════════════════════════════════════════════════════
+  [phys] Fz_N                            19.6% █████████
+  [stra] Driver                          17.0% ████████
+  [stra] RaceLapFraction                 13.3% ██████
+  [stra] Team                            12.5% ██████
+  [stra] StintNumber                      9.3% ████
+  [stra] TrackName                        9.2% ████
+  [phys] TyreHealth                       6.8% ███
+  [stra] RaceLapNumber                    5.6% ██
+  [stra] Compound                         4.5% ██
+  [phys] TyreTemp_C                       2.1% █
+
+  Per-tier breakdown:
+    strategy  :  71.5% total (7/7 features active)
+    physics   :  28.5% total (3/3 features active)
+
+  Physical validation
+     Well-distributed (max: Fz_N at 19.6%)
+     All features contributing
+
+═════════════════════════════════════════════════════════════════
+  TOP FEATURE INTERACTIONS
+═════════════════════════════════════════════════════════════════
+  TrackName                 × Fz_N                      Str: 9.69
+  RaceLapNumber             × Fz_N                      Str: 6.35
+  RaceLapFraction           × Fz_N                      Str: 5.44
+  Driver                    × Fz_N                      Str: 5.07
+  TrackName                 × Driver                    Str: 4.79
+  TyreHealth                × Fz_N                      Str: 4.40
+  Driver                    × RaceLapFraction           Str: 4.33
+  StintNumber               × Fz_N                      Str: 3.26
+  RaceLapFraction           × TyreHealth                Str: 2.96
+  Compound                  × Fz_N                      Str: 2.59
+
+═════════════════════════════════════════════════════════════════
+  PREDICTION TESTS
+═════════════════════════════════════════════════════════════════
+  PacePredictor loaded
+   Baselines: 61 groups (mode: track_season)
+   Features: 10
+   Strategy: ['Compound', 'TrackName', 'Driver', 'Team', 'StintNumber', 'RaceLapNumber', 'RaceLapFraction']
+   Physics:  ['TyreHealth', 'Fz_N', 'TyreTemp_C']
+
+  Sample prediction:
+    Driver:         ALB (Williams)
+    Track:          Yas Island
+    Season:         2022
+    Baseline:       91.27s
+    Compound:       MEDIUM (Age: 2, Stint: 1)
+    Race lap:       2/58
+    TyreHealth      : 1.0000
+    Fz_N            : 21682.6054
+    TyreTemp_C      : 40.0000
+    ---
+    Actual abs:     93.227s
+    Strategy pred:  93.234s (error: +0.007s)
+    Uncertainty:    ±0.048s
+
+  Strategy Simulation Demo:
+    Simulating 1-stop vs 2-stop from lap 1
+    1-stop (['HARD', 'MEDIUM']): 5413.0s total (1 pit × 22s)
+    2-stop (['HARD', 'MEDIUM', 'SOFT']): 5431.8s total (2 pits × 22s)
+    Δ = 18.7s → 1-stop preferred
+
+  Report saved to: models/training_report.txt
+
+═════════════════════════════════════════════════════════════════
+  PIPELINE COMPLETE
+═════════════════════════════════════════════════════════════════
+  Total:       705.4s (11.8 min)
+  GPU:         Yes
+  Baseline:    track_season
+  Laps:        57,754 raw → 57,407 filtered
+  Delta RMSE:  0.8009s
+  Delta R²:    0.5790
+  Best iter:   462
+
+  Health Assessment:
+    R² = 0.5790
+    Avg best_iter = 462
+    RMSE = 0.8009s
+    Physics tier: 28.5%
+    Overfit ratio: 0.74 (train 0.5906s / CV 0.8009s)
+
+  All health checks passed.
+
+  Prediction modes:
+    Strategy:    predictor.predict(...)
+    Batch:       predictor.predict_batch(df)
+    Uncertainty: predictor.predict_with_uncertainty(...)
+    Simulate:    predictor.simulate_strategy(...)
+
+ V3 model training complete. Ready for strategy engine.
