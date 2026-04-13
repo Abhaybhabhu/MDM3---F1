@@ -1,0 +1,107 @@
+<svg width="100%" viewBox="0 0 800 500" role="img">
+  <title>F1 tyre health pipeline schematic v2</title>
+  <desc>A schematic showing how observed telemetry inputs pass through physics equations to estimate latent tyre health, which then drives lap time prediction via a machine learning model.</desc>
+ <defs>
+  <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#AAAAAA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#4A90D9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#00B4A6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#E10600" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+  <!-- SECTION LABEL -->
+  <text font-family="sans-serif" font-size="12" x="70" y="88" text-anchor="middle" fill="#AAAAAA">Observed inputs</text>
+
+  <!-- INPUT FEATURES BOX -->
+  <rect x="10" y="98" width="120" height="90" rx="8" fill="#2C2C2C" stroke="#E10600" stroke-width="1"/>
+  <text font-family="sans-serif" font-size="14" font-weight="500" x="70" y="128" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF">Input features</text>
+  <text font-family="sans-serif" font-size="11" x="70" y="148" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Telemetry data</text>
+  <text font-family="sans-serif" font-size="11" x="70" y="163" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Tyre compound</text>
+  <text font-family="sans-serif" font-size="11" x="70" y="178" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Fuel load · tyre age</text>
+
+  <!-- Arrow: input to physics -->
+  <line x1="130" y1="143" x2="188" y2="143" stroke="#AAAAAA" stroke-width="0.8" marker-end="url(#arrow-gray)" fill="none"/>
+
+  <!-- PHYSICS ENGINE BOX -->
+  <text font-family="sans-serif" font-size="12" x="254" y="78" text-anchor="middle" fill="#AAAAAA">Physics-informed</text>
+  <rect x="190" y="88" width="148" height="110" rx="8" fill="#2C2C2C" stroke="#4A90D9" stroke-width="1.2"/>
+  <text font-family="sans-serif" font-size="14" font-weight="500" x="264" y="124" text-anchor="middle" dominant-baseline="central" fill="#4A90D9">Physics engine</text>
+  <text font-family="sans-serif" font-size="12" x="264" y="144" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Degradation model</text>
+  <text font-family="sans-serif" font-size="12" x="264" y="159" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Thermal equations</text>
+  <text font-family="sans-serif" font-size="12" x="264" y="174" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Wear rate</text>
+
+  <!-- Arrow: physics to latent -->
+  <line x1="338" y1="143" x2="396" y2="143" stroke="#AAAAAA" stroke-width="1.2" marker-end="url(#arrow-gray)" fill="none"/>
+
+  <!-- LATENT VARIABLE BOX -->
+  <rect x="398" y="86" width="148" height="114" rx="8" fill="#1A1A1A" stroke="#00B4A6" stroke-width="1.8" stroke-dasharray="6 3"/>
+  <rect x="440" y="78" width="64" height="18" rx="9" fill="#00B4A6"/>
+  <text font-family="sans-serif" font-size="12" font-weight="500" x="472" y="87" text-anchor="middle" dominant-baseline="central" fill="#1A1A1A">latent</text>
+  <text font-family="sans-serif" font-size="14" font-weight="500" x="472" y="124" text-anchor="middle" dominant-baseline="central" fill="#00B4A6">Tyre health</text>
+  <text font-family="sans-serif" font-size="12" x="472" y="143" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">estimated state</text>
+  <text font-family="sans-serif" font-size="12" x="472" y="158" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">not directly</text>
+  <text font-family="sans-serif" font-size="12" x="472" y="173" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">observable</text>
+
+  <!-- Arrow: latent to ML -->
+  <line x1="546" y1="143" x2="604" y2="143" stroke="#AAAAAA" stroke-width="1.4" marker-end="url(#arrow-gray)" fill="none"/>
+
+  <!-- ML MODEL BOX -->
+  <text font-family="sans-serif" font-size="12" x="638" y="78" text-anchor="middle" fill="#AAAAAA">Model</text>
+  <rect x="606" y="88" width="68" height="110" rx="8" fill="#2C2C2C" stroke="#4A90D9" stroke-width="1"/>
+  <text font-family="sans-serif" font-size="13" font-weight="500" x="640" y="130" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF">ML</text>
+  <text font-family="sans-serif" font-size="13" font-weight="500" x="640" y="148" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF">model</text>
+
+
+  <!-- Arrow: ML to output -->
+  <line x1="640" y1="198" x2="640" y2="252" stroke="#AAAAAA" stroke-width="1.4" marker-end="url(#arrow-gray)" fill="none"/>
+
+  <!-- OUTPUT BOX -->
+  <rect x="592" y="254" width="96" height="56" rx="8" fill="#2C2C2C" stroke="#E10600" stroke-width="1.4"/>
+  <text font-family="sans-serif" font-size="14" font-weight="500" x="640" y="278" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF">Lap time</text>
+  <text font-family="sans-serif" font-size="12" x="640" y="296" text-anchor="middle" dominant-baseline="central" fill="#E10600">predicted</text>
+
+  <!-- Arrow: output to strategy -->
+  <line x1="640" y1="310" x2="640" y2="358" stroke="#AAAAAA" stroke-width="0.8" marker-end="url(#arrow-gray)" fill="none"/>
+
+  <!-- STRATEGY BOX -->
+  <rect x="484" y="360" width="312" height="56" rx="8" fill="#2C2C2C" stroke="#444444" stroke-width="0.8"/>
+  <text font-family="sans-serif" font-size="14" font-weight="500" x="640" y="384" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF">Strategy optimiser</text>
+  <text font-family="sans-serif" font-size="12" x="640" y="402" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Pit window estimation · uncertainty analysis</text>
+
+  <!-- UNCERTAINTY BAND -->
+  <rect x="398" y="216" width="148" height="26" rx="6" fill="#00B4A620" stroke="#00B4A6" stroke-width="0.6" stroke-dasharray="3 2"/>
+  <text font-family="sans-serif" font-size="11" x="472" y="230" text-anchor="middle" dominant-baseline="central" fill="#00B4A6">± degradation uncertainty</text>
+
+  <!-- Uncertainty arrow to strategy -->
+  <line x1="472" y1="242" x2="472" y2="322" stroke="#00B4A6" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow-teal)" fill="none"/>
+  <line x1="472" y1="322" x2="484" y2="388" stroke="#00B4A6" stroke-width="1.4" stroke-dasharray="4 3" fill="none"/>
+
+  <!-- EXPLAINABILITY ANNOTATION -->
+  <line x1="264" y1="198" x2="264" y2="256" stroke="#4A90D9" stroke-width="0.6" stroke-dasharray="4 3" fill="none"/>
+  <rect x="164" y="258" width="200" height="44" rx="6" fill="#1A1A1A" stroke="#4A90D9" stroke-width="0.6" stroke-dasharray="4 3"/>
+  <text font-family="sans-serif" font-size="12" x="264" y="276" text-anchor="middle" dominant-baseline="central" fill="#4A90D9">Engineered features</text>
+  <text font-family="sans-serif" font-size="12" x="264" y="292" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">explainability for engineers</text>
+
+  <!-- LEGEND -->
+  <rect x="10" y="430" width="700" height="60" rx="8" fill="#2C2C2C" stroke="#444444" stroke-width="0.5"/>
+  <text font-family="sans-serif" font-size="12" x="30" y="455" dominant-baseline="central" fill="#AAAAAA">Legend</text>
+  <rect x="90" y="444" width="34" height="16" rx="4" fill="#1A1A1A" stroke="#00B4A6" stroke-width="1" stroke-dasharray="4 2"/>
+  <text font-family="sans-serif" font-size="12" x="132" y="452" dominant-baseline="central" fill="#AAAAAA">Latent variable</text>
+  <rect x="240" y="444" width="34" height="16" rx="4" fill="#2C2C2C" stroke="#4A90D9" stroke-width="1"/>
+  <text font-family="sans-serif" font-size="12" x="282" y="452" dominant-baseline="central" fill="#AAAAAA">Physics / ML block</text>
+  <rect x="400" y="444" width="34" height="16" rx="4" fill="#2C2C2C" stroke="#E10600" stroke-width="1"/>
+  <text font-family="sans-serif" font-size="12" x="442" y="452" dominant-baseline="central" fill="#AAAAAA">Output / prediction</text>
+  <line x1="90" y1="472" x2="124" y2="472" stroke="#00B4A6" stroke-width="0.8" stroke-dasharray="4 3"/>
+  <text font-family="sans-serif" font-size="12" x="132" y="472" dominant-baseline="central" fill="#AAAAAA">Uncertainty propagation</text>
+  <line x1="310" y1="472" x2="344" y2="472" stroke="#AAAAAA" stroke-width="1.2"/>
+  <text font-family="sans-serif" font-size="12" x="352" y="472" dominant-baseline="central" fill="#AAAAAA">Data / signal flow</text>
+
+
+</svg>
