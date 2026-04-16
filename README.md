@@ -24,6 +24,10 @@ Can a physics-based model of features aid in neural network's prediction of lap 
 
 ## Model Overview
 
+## Pipeline
+
+![Pipeline Diagram](figures/data_pipeline.svg)
+
 ...
 
 ---
