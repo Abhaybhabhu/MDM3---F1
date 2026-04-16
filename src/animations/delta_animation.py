@@ -4,7 +4,7 @@
 
 # ================================================================
 # this assumes that the model outputs a predicted time as a string (or anything subscriptable) in the format 'X:YY.ZZZ'
-# adjust parse_time(time) inside animate_ghost_comparison() if the format is different
+# adjust parse_time(time) inside animate_ghost_comparison() and the legend if the format is different
 # ================================================================
 
 # call/ import animate_ghost_comparison()
@@ -21,7 +21,7 @@ import matplotlib.animation as animation
 import numpy as np
 import fastf1
 
-def animate_ghost_comparison(session, driver, lap_number, pred_time, 
+def animate_ghost_comparison(session, driver, year, lap_number, pred_time, 
                              show_data=True, save_path=None, interval=20):
     """
     animate ghost car moving at average speed to match predicted pace
@@ -36,7 +36,9 @@ def animate_ghost_comparison(session, driver, lap_number, pred_time,
     pred_secs = parse_time(pred_time)
     print(f"Predicted lap time in seconds: {pred_secs}")
     actual_data = get_data(session, driver, lap_number)
+    print(actual_data)
     actual_time = actual_data['time'][-1]
+    secs = actual_time - 60
 
     time_diff = pred_secs - actual_time
     ghost_fin_first = pred_secs < actual_time
@@ -48,23 +50,23 @@ def animate_ghost_comparison(session, driver, lap_number, pred_time,
     ax.plot(actual_data['x'], actual_data['y'], color=actual_data['colour'], linewidth=1, alpha=0.2)
 
     actual_car = ax.scatter([], [], s=150, c=actual_data['colour'], 
-                            edgecolors='white', zorder=5, label='Actual')
+                            edgecolors='white', zorder=5, label=f'Actual (1:{secs:.3f})')
     actual_trail, = ax.plot([], [], color=actual_data['colour'], linewidth=2)
 
     ghost_car = ax.scatter([], [], s=150, c='#8888FF', 
-                           edgecolors='white', zorder=4, label=f'Predicted ({pred_secs:.2f}s)', alpha=0.7)
+                           edgecolors='white', zorder=4, label=f'Predicted ({pred_time})', alpha=0.7)
     ghost_trail, = ax.plot([], [], color='#8888FF', linewidth=2, alpha=0.5)
 
-    info_text = ax.text(0.7, 0.3, '', transform=ax.transAxes, fontsize=10, 
+    info_text = ax.text(0.5, 0.3, '', transform=ax.transAxes, fontsize=10, 
                         verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
     info_text.set_visible(show_data)
 
     ax.legend(loc='upper right', fontsize=9, framealpha=0.5)
     ax.set_aspect('equal')
     ax.axis('off')
-    ax.set_title(f"{actual_data['track']} | {driver} | Lap {lap_number}", color='white', pad=20)
+    ax.set_title(f"{actual_data['track']} {year} | {driver} | Lap {lap_number}", color='white', pad=20)
 
-    fps = 30
+    fps = 60
     total_frames = int(max(actual_time, pred_secs) * fps)
 
     actual_fin = False
@@ -174,15 +176,15 @@ def animate_ghost_comparison(session, driver, lap_number, pred_time,
 if __name__ == "__main__":
     fastf1.Cache.enable_cache(cache_location)
 
-    year = 2022
-    event = 20
+    year = 2023
+    event = 3
     session_type = 'R' 
 
     try:
         session = fastf1.get_session(year, event, session_type)
         session.load()
 
-        animate_ghost_comparison(session, driver='HAM', lap_number=17, pred_time='1:16.029', 
+        animate_ghost_comparison(session, driver='HUL', year=year, lap_number=41, pred_time='1:18.114', 
                                  show_data=True, save_path=None, interval=20)
 
     except Exception as e:
