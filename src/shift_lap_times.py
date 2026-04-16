@@ -28,14 +28,13 @@ if __name__ == "__main__":
     initial_df = df.copy() # for debugging
     print("Shifting data to align features with next lap time...")
     df = df.sort_values(["RaceID", "Driver", "LapNumber"]).reset_index(drop=True)
-    df["LapTimeSec"] = df.groupby(["RaceID", "Driver"])["LapTimeSec"].shift(-1)
     df["TyreHealth"] = df.groupby(["RaceID", "Driver"])["TyreHealth"].shift(-1)
     df["TyreTemp_C"] = df.groupby(["RaceID", "Driver"])["TyreTemp_C"].shift(-1)
     df["Psi_T"] = df.groupby(["RaceID", "Driver"])["Psi_T"].shift(-1)
     df["SlidingProxy"] = df.groupby(["RaceID", "Driver"])["SlidingProxy"].shift(-1)
     df["Fz_N"] = df.groupby(["RaceID", "Driver"])["Fz_N"].shift(-1)
     print("Dropping rows with NaN values (last lap of each stint)...")
-    df = df.dropna(subset=["LapTimeSec", "TyreHealth", "TyreTemp_C", "Psi_T", "SlidingProxy", "Fz_N"])
+    df = df.dropna(subset=["TyreHealth", "TyreTemp_C", "Psi_T", "SlidingProxy", "Fz_N"])
     print("Saving shifted data to:", OUTPUT_PARQUET_PATH)
     df.to_parquet(OUTPUT_PARQUET_PATH, index=False)
     print("Done.")
@@ -57,9 +56,9 @@ if __name__ == "__main__":
             initial_sample = initial_sample.iloc[0]
             print(f"\nSample index: {index}")
             print("Shifted sample:")
-            print(sample[["RaceID", "Driver", "LapNumber", "LapTimeSec", "TyreHealth", "TyreTemp_C", "Psi_T", "SlidingProxy", "Fz_N"]])
+            print(sample[["RaceID", "Driver","LapTimeSec", "LapNumber", "TyreHealth", "TyreTemp_C", "Psi_T", "SlidingProxy", "Fz_N"]])
             print("Initial sample (should be the previous lap):")
-            print(initial_sample[["RaceID", "Driver", "LapNumber", "LapTimeSec", "TyreHealth", "TyreTemp_C", "Psi_T", "SlidingProxy", "Fz_N"]])
+            print(initial_sample[["RaceID", "Driver","LapTimeSec", "LapNumber", "TyreHealth", "TyreTemp_C", "Psi_T", "SlidingProxy", "Fz_N"]])
         else:
             print(f"\nSample index: {index} - No matching initial sample found (this is expected for the last lap of each stint).") 
         initialsample = initial_df.sample(1).iloc[0]
