@@ -112,7 +112,8 @@ def detect_gpu() -> bool:
 # ═══════════════════════════════════════════════════════════════
 
 # ── Paths ─────────────────────────────────────────────────────
-DATA_PATH = "training_data_with_physics.parquet"
+BASE_DIR = pathlib.Path(__file__).resolve().parents[1]
+DATA_PATH = str(BASE_DIR / "data" / "processed" / "training_data_with_physics_shifted.parquet")
 MODEL_DIR = pathlib.Path("models")
 MODEL_DIR.mkdir(exist_ok=True)
 MODEL_PATH = MODEL_DIR / "pace_model_physics.cbm"
@@ -176,8 +177,7 @@ NUMERICAL_FEATURES = [
     # ── Physics-informed features ──
     "DamageState",
     "TyreTemp_C",
-    "SlidingProxy",
-    "Fz_N",
+    "SlidingProxy", # NOTE: removed F_zN for now.
 ]
 
 ALL_FEATURES = CATEGORICAL_FEATURES + NUMERICAL_FEATURES
@@ -314,6 +314,11 @@ def load_data(path: str = DATA_PATH) -> pd.DataFrame:
         if c != "RaceLapFraction"   # engineered later
     ] + [RAW_TARGET, GROUP_KEY]
     missing = [c for c in base_required if c not in df.columns]
+    # if missing damage state, try to compute it from TyreHealth
+    if "DamageState" in missing and "TyreHealth" in df.columns:
+        df["DamageState"] = 1.0 - df["TyreHealth"]
+        missing.remove("DamageState")
+        print("   Computed DamageState from TyreHealth")
     if missing:
         raise ValueError(f"Missing columns: {missing}")
 
