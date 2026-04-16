@@ -1536,6 +1536,7 @@ def save_report(
     n_laps_after_filter: int = 0,
     ablation_results: Optional[dict] = None,
     total_time: float = 0.0,
+    output_path: Optional[pathlib.Path] = None,
 ):
     """Save a text report of the training results."""
     avg = {
@@ -1639,7 +1640,9 @@ def save_report(
             f"  {key:35s} {track_baselines[key]:.2f}s"
         )
 
-    REPORT_PATH.write_text(
+    if not output_path:
+        output_path = REPORT_PATH
+    output_path.write_text(
         "\n".join(lines), encoding="utf-8"
     )
     print(f"\n   Report saved to: {REPORT_PATH}")
