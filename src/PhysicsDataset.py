@@ -17,6 +17,8 @@ from typing import Optional, Dict, List
 import numpy as np
 import pandas as pd
 import fastf1
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore", module="fastf1")
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -27,7 +29,20 @@ SESSION_TYPE = "R"
 CACHE_DIR = "fastf1_cache"
 OUTPUT_RAW_CSV = "physics_raw_2022_2025.csv"
 OUTPUT_MODELLED_CSV = "physics_modelled_2022_2025.csv"
+OUTPUT_FILTER_PLOT = "figures/lap_filter_reasons.pdf"
 REQUEST_PAUSE_SEC = 1.0
+
+COLORS = {
+    "background": "#1A1A1A",
+    "axes": "#2C2C2C",
+    "grid": "#444444",
+    "text": "#FFFFFF",
+    "text_muted": "#AAAAAA",
+    "soft": "#E10600",
+    "medium": "#4A90D9",
+    "hard": "#00B4A6",
+    "secondary": "#AAAAAA",
+}
 
 DRY_COMPOUNDS = {"SOFT", "MEDIUM", "HARD"}
 WET_COMPOUNDS = {"WET", "INTERMEDIATE"}
@@ -158,6 +173,79 @@ def get_circuit_length_km(location: str) -> float:
         if key.lower() in loc_lower or loc_lower in key.lower():
             return val
     return 5.0
+
+
+def increment_reason(counts: Dict[str, int], reason: str) -> None:
+    counts[reason] = counts.get(reason, 0) + 1
+
+
+def format_reason_label(reason: str) -> str:
+    return reason.replace("_", " ").strip().title()
+
+
+def plot_lap_filter_reasons(
+    filter_reasons: Dict[str, int],
+    total_laps_seen: int,
+    kept_laps: int,
+    output_path: pathlib.Path,
+) -> None:
+    if not filter_reasons:
+        print("\nNo lap-level filter reasons recorded; skipping plot.")
+        return
+
+    total_filtered = max(total_laps_seen - kept_laps, 0)
+    plot_df = pd.DataFrame(
+        {
+            "Reason": list(filter_reasons.keys()),
+            "LapsFiltered": list(filter_reasons.values()),
+        }
+    ).sort_values("LapsFiltered", ascending=False)
+    plot_df["ReasonLabel"] = plot_df["Reason"].apply(format_reason_label)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    sns.set_theme(style="whitegrid")
+    fig_w = 12
+    fig_h = max(5, 0.5 * len(plot_df) + 2)
+    fig = plt.figure(figsize=(fig_w, fig_h))
+    fig.patch.set_facecolor(COLORS["background"])
+
+    palette = [COLORS["soft"]] + [COLORS["secondary"]] * max(len(plot_df) - 1, 0)
+    ax = sns.barplot(data=plot_df, x="LapsFiltered", y="ReasonLabel", palette=palette)
+    ax.set_facecolor(COLORS["axes"])
+    ax.set_title(
+        f"Lap Filtering Summary (Filtered: {total_filtered:,} / {total_laps_seen:,}, Kept: {kept_laps:,})",
+        fontsize=12,
+        color=COLORS["soft"],
+        weight="bold",
+    )
+    ax.set_xlabel("Number of laps filtered out", color=COLORS["text_muted"])
+    ax.set_ylabel("Filter reason", color=COLORS["text_muted"])
+    ax.tick_params(axis="x", colors=COLORS["text"])
+    ax.tick_params(axis="y", colors=COLORS["text"])
+    ax.grid(axis="x", color=COLORS["grid"], linewidth=0.8)
+    ax.grid(axis="y", visible=False)
+    for spine in ax.spines.values():
+        spine.set_color(COLORS["grid"])
+
+    for p in ax.patches:
+        width = int(p.get_width())
+        if width > 0:
+            ax.annotate(
+                f"{width:,}",
+                (p.get_width(), p.get_y() + p.get_height() / 2),
+                ha="left",
+                va="center",
+                xytext=(6, 0),
+                textcoords="offset points",
+                fontsize=9,
+                color=COLORS["text"],
+            )
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"\nSaved lap-filter plot: {output_path}")
 
 
 # TELEMETRY EXTRACTION (per lap, fully defensive)
@@ -294,7 +382,13 @@ def get_weather_for_laps(laps_df: pd.DataFrame, session, verbose:bool = False) -
 
 
 # STAGE 1: PROCESS ONE RACE
-def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Optional[pd.DataFrame]:
+def process_race(
+    year: int,
+    event_row: pd.Series,
+    verbose: bool = False,
+    global_filter_reasons: Optional[Dict[str, int]] = None,
+    lap_stats: Optional[Dict[str, int]] = None,
+) -> Optional[pd.DataFrame]:
     round_number = int(event_row["RoundNumber"])
     event_name = str(event_row["EventName"])
     location = get_location(event_row)
@@ -350,6 +444,8 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
             lap = all_laps.iloc[i]
         except Exception as e:
             fail_count += 1
+            if global_filter_reasons is not None:
+                increment_reason(global_filter_reasons, "lap_access_error")
             if verbose:
                 print(f"    Failed to access lap data for lap index {i}: {e}")
             continue
@@ -367,10 +463,14 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
             if verbose:
                 print(f"    Failed to parse lap number for lap index {i}: {e}")
             fail_count += 1
+            if global_filter_reasons is not None:
+                increment_reason(global_filter_reasons, "lap_number_parse_error")
             continue
         
         if lap_number < MIN_LAP_NUMBER:
             skip_count += 1
+            if global_filter_reasons is not None:
+                increment_reason(global_filter_reasons, "lap_1_or_invalid_lap_number")
             continue
         
         lap_time = lap.get("LapTime", pd.NaT)
@@ -378,6 +478,8 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
             if verbose:
                 print(f"    Lap time is NaT for lap index {i}, skipping")
             skip_count += 1
+            if global_filter_reasons is not None:
+                increment_reason(global_filter_reasons, "missing_lap_time")
             continue
         
         try:
@@ -386,18 +488,24 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
             if verbose:
                 print(f"    Failed to parse lap time for lap index {i}: {e}")
             skip_count += 1
+            if global_filter_reasons is not None:
+                increment_reason(global_filter_reasons, "unparseable_lap_time")
             continue
         
         if lap_time_s <= 0 or lap_time_s > 300:
             if verbose:
                 print(f"    Lap time is out of bounds for lap index {i}: {lap_time_s}")
             skip_count += 1
+            if global_filter_reasons is not None:
+                increment_reason(global_filter_reasons, "lap_time_out_of_bounds")
             continue
         
         pit_in = lap.get("PitInTime", pd.NaT)
         pit_out = lap.get("PitOutTime", pd.NaT)
         if pd.notna(pit_in) or pd.notna(pit_out):
             skip_count += 1
+            if global_filter_reasons is not None:
+                increment_reason(global_filter_reasons, "pit_in_or_out_lap")
             if verbose:
                 print(f"    Lap has pit in/out for lap index {i}")
             continue
@@ -405,6 +513,8 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
         compound = str(lap.get("Compound", "")).upper().strip()
         if compound not in DRY_COMPOUNDS:
             skip_count += 1
+            if global_filter_reasons is not None:
+                increment_reason(global_filter_reasons, "non_dry_compound")
             if verbose:
                 print(f"    Compound is not dry for lap index {i}")
             continue
@@ -412,6 +522,8 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
         driver = str(lap.get("Driver", "")).strip()
         if not driver:
             skip_count += 1
+            if global_filter_reasons is not None:
+                increment_reason(global_filter_reasons, "missing_driver")
             if verbose:
                 print(f"    Missing driver name for lap index {i}")
             continue
@@ -419,6 +531,8 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
         tel_features = extract_lap_telemetry(lap, verbose=verbose)
         if tel_features is None:
             fail_count += 1
+            if global_filter_reasons is not None:
+                increment_reason(global_filter_reasons, "telemetry_extraction_failed")
             if verbose:
                 print(f"    Failed to extract telemetry for lap index {i}")
             continue
@@ -467,6 +581,12 @@ def process_race(year: int, event_row: pd.Series, verbose: bool=False) -> Option
             print(f"    Progress: {i+1}/{total}  (ok={ok_count} fail={fail_count} skip={skip_count})", end="\r")
     
     print(f"    Done: {ok_count} ok, {fail_count} fail, {skip_count} skip out of {total} laps")
+
+    if lap_stats is not None:
+        lap_stats["total"] = lap_stats.get("total", 0) + total
+        lap_stats["kept"] = lap_stats.get("kept", 0) + ok_count
+        lap_stats["failed"] = lap_stats.get("failed", 0) + fail_count
+        lap_stats["skipped"] = lap_stats.get("skipped", 0) + skip_count
     
     if not rows:
         print("    No usable rows")
@@ -604,6 +724,8 @@ def main():
     all_frames: List[pd.DataFrame] = []
     saved = []
     failed = []
+    lap_filter_reasons: Dict[str, int] = {}
+    lap_stats: Dict[str, int] = {"total": 0, "kept": 0, "failed": 0, "skipped": 0}
     # NOTE : changed this for testing.
     for year in SEASONS:
         print(f"\n{'='*60}")
@@ -628,7 +750,13 @@ def main():
                 continue
             
             try:
-                race_df = process_race(year, event_row, verbose=False)
+                race_df = process_race(
+                    year,
+                    event_row,
+                    verbose=False,
+                    global_filter_reasons=lap_filter_reasons,
+                    lap_stats=lap_stats,
+                )
             except Exception as e:
                 print(f"  Crashed on {event_name}: {e}")
                 race_df = None
@@ -700,6 +828,14 @@ def main():
         print(f"\nFailed/skipped ({len(failed)}):")
         for f in failed:
             print(f"  - {f}")
+
+    print(f"\nLap filtering totals: filtered={lap_stats['total'] - lap_stats['kept']:,} / {lap_stats['total']:,}, kept={lap_stats['kept']:,}")
+    plot_lap_filter_reasons(
+        filter_reasons=lap_filter_reasons,
+        total_laps_seen=lap_stats["total"],
+        kept_laps=lap_stats["kept"],
+        output_path=pathlib.Path(OUTPUT_FILTER_PLOT),
+    )
 
 
 if __name__ == "__main__":

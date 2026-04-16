@@ -8,5 +8,6 @@ scipy==1.17.1
 seaborn==0.13.2
 parquet==1.2.0
 pyarrow==23.0.1
+catboost==1.2.10
 
 

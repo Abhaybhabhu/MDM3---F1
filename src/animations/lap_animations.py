@@ -1,10 +1,12 @@
 # animations
+# single lap telemetry trace
 
 # set cache location - folder must exist before running
 cache_location = "fastf1_cache/"
 
 # usage:
-# import this file and call animate_single_driver_lap(session, driver='LAT', lap_number=14, show_data=False, save_path=None)
+# import this file and call 
+# animate_single_driver_lap(session, driver='VER', year=year, lap_number=5, show_data=True, save_path='anims/VER_IMOLA_2025.mp4', interval=10)
 # or call animate_multiple_drivers_lap(session, drivers=['VER', 'HAM', 'LEC'], lap_number=14, show_data=False, save_path=None)
 
 import fastf1
@@ -114,7 +116,7 @@ def get_multiple_drivers_data(session, drivers, lap_number=7):
 
     return all_data
 
-def setup_plot(data, lap_number, show_data=True):
+def setup_plot(data, lap_number, year, show_data=True):
     """
     initializes the matplotlib figure for single driver
     """
@@ -125,13 +127,17 @@ def setup_plot(data, lap_number, show_data=True):
     car_marker = ax.scatter([], [], s=100, c=data['colour'], edgecolors='black', zorder=5)
     trail_line, = ax.plot([], [], color='red', linewidth=2)
 
-    info_text = ax.text(0.7, 0.3, '', transform=ax.transAxes, fontsize=10, 
+    info_text = ax.text(0.5, 0.3, '', transform=ax.transAxes, fontsize=10, 
                         verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
     info_text.set_visible(show_data)
 
     ax.set_aspect('equal')
     ax.axis('off')
-    ax.set_title(f"Driver: {data['driver']} | {data['track']} | Lap {lap_number}")
+
+    lap_time = data['time'][-1]
+    seconds = lap_time - 60
+
+    ax.set_title(f"{data['track']} {year} | {data['driver']} | Lap {lap_number} (1:{seconds:.3f})")
 
     return fig, ax, car_marker, trail_line, info_text
 
@@ -179,15 +185,15 @@ def setup_multiple_plot(all_data, lap_number, show_data=True):
 
     return fig, ax, car_markers, trail_lines, info_texts
 
-def animate_single_driver_lap(session, driver, lap_number=1, show_data=True, save_path=None, interval=10):
+def animate_single_driver_lap(session, driver, year, lap_number=1, show_data=True, save_path=None, interval=10):
     """
     generate animation for a single driver over a single lap
     """
     print(f"Getting data for {driver}...")
     data = get_data(session, driver, lap_number)
-    
+
     print("Setting up plot...")
-    fig, ax, car_marker, trail_line, info_text = setup_plot(data, lap_number, show_data=show_data)
+    fig, ax, car_marker, trail_line, info_text = setup_plot(data, lap_number, year, show_data=show_data)
 
     # nested functions to make FuncAnimation easier to use
     def init():
@@ -230,7 +236,7 @@ def animate_single_driver_lap(session, driver, lap_number=1, show_data=True, sav
     print("Generating animation...")
 
     anim = animation.FuncAnimation(fig, update, frames=len(data['time']), 
-                                   init_func=init, blit=True, interval=interval)
+                                   init_func=init, blit=True, interval=interval, repeat=False)
 
     if save_path:
         print(f"Saving to {save_path}...")
@@ -315,8 +321,8 @@ def animate_multiple_drivers_lap(session, drivers, lap_number=1, show_data=True,
 if __name__ == "__main__":
     fastf1.Cache.enable_cache(cache_location) 
 
-    year = 2025
-    event = 19
+    year = 2024
+    event = 21
     session_type = 'R' 
 
     try:
@@ -324,11 +330,11 @@ if __name__ == "__main__":
         session.load()
 
         # single driver example
-        # animate_single_driver_lap(session, driver='BEA', lap_number=12, show_data=False, save_path=None, interval=10)
+        animate_single_driver_lap(session, driver='VER', year=year, lap_number=48, show_data=True, save_path=None, interval=10)
 
         # multiple drivers example
-        animate_multiple_drivers_lap(session, drivers=['BOR', 'GAS', 'HAD'], lap_number=9, 
-                                     show_data=False, save_path=None, interval=10)
+        # animate_multiple_drivers_lap(session, drivers=['RUS', 'ALO', 'SAI'], lap_number=9, 
+        #                             show_data=False, save_path=None, interval=10)
 
     except Exception as e:
         print(f"An error occurred: {e}")

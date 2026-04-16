@@ -1,0 +1,139 @@
+F1 VIRTUAL RACE STRATEGIST — TRAINING REPORT (v2)
+=======================================================
+
+Dataset: 57,754 laps from 61 races
+After outlier filtering: 57,407 laps
+Features: 14 (4 cat, 10 num)
+Model: CatBoost Regressor
+Target: LapTimeDelta (delta from per-track median)
+Baseline mode: track_season
+GPU: No
+Pipeline time: 0.0s (0.0 min)
+
+CROSS-VALIDATION (GroupKFold by RaceID)
+-------------------------------------------------------
+Folds: 3
+Delta RMSE: 0.7851s ± 0.0136s
+Delta MAE:  0.5862s
+Delta R²:   0.5958
+Abs   RMSE: 0.7851s
+Avg best_iter: 463
+CV time:    11.4s
+
+  Fold 0: Δ RMSE=0.8027s  Abs RMSE=0.8027s  best_iter=558  (18948 laps, 20 races, 4.5s)
+  Fold 1: Δ RMSE=0.7831s  Abs RMSE=0.7831s  best_iter=396  (18950 laps, 20 races, 3.1s)
+  Fold 2: Δ RMSE=0.7695s  Abs RMSE=0.7695s  best_iter=436  (19509 laps, 21 races, 3.7s)
+
+HYPERPARAMETERS
+-------------------------------------------------------
+  depth: 6
+  iterations: 2500
+  l2_leaf_reg: 10.0
+  langevin: True
+  learning_rate: 0.02
+  loss_function: RMSE
+  min_data_in_leaf: 50
+  posterior_sampling: True
+  random_seed: 42
+  verbose: 200
+
+TUNING CONFIG
+-------------------------------------------------------
+  early_stopping_rounds: 80
+  max_iterations: 2000
+  n_splits: 2
+  n_trials: 30
+  subsample_frac: 1.0
+
+OUTLIER CONFIG
+-------------------------------------------------------
+  hard_cap_seconds: 15.0
+  lower_quantile: 0.001
+  upper_quantile: 0.995
+
+FEATURE IMPORTANCE
+-------------------------------------------------------
+  Team                  24.6%
+  RaceLapFraction       20.5%
+  Driver                12.1%
+  RaceLapNumber          9.8%
+  TireAge                7.0%
+  TireAgeSq              6.6%
+  TrackName              5.7%
+  GapToCarAhead          4.0%
+  Humidity               2.5%
+  AirTemp                2.4%
+  TrackTemp              1.9%
+  Compound               1.5%
+  WindSpeed              0.9%
+  DRS_Available          0.5%
+
+TRACKNAME ABLATION
+-------------------------------------------------------
+  with_track          : RMSE=0.7949s  R²=0.5857
+  without_track       : RMSE=0.7862s  R²=0.5947
+
+PER-TRACK BASELINES
+-------------------------------------------------------
+  Mode: track_season
+  Austin_2022                         103.18s
+  Baku_2022                           109.68s
+  Baku_2024                           108.89s
+  Baku_2025                           105.93s
+  Barcelona_2022                      88.80s
+  Barcelona_2023                      80.18s
+  Barcelona_2024                      80.67s
+  Barcelona_2025                      81.04s
+  Budapest_2023                       84.57s
+  Budapest_2024                       84.38s
+  Budapest_2025                       82.27s
+  Imola_2024                          81.96s
+  Imola_2025                          81.58s
+  Jeddah_2022                         95.23s
+  Jeddah_2023                         95.17s
+  Jeddah_2024                         94.08s
+  Jeddah_2025                         94.40s
+  Las Vegas_2023                      98.75s
+  Las Vegas_2024                      98.42s
+  Las Vegas_2025                      96.08s
+  Le Castellet_2022                   99.77s
+  Marina Bay_2023                     100.41s
+  Marina Bay_2024                     98.53s
+  Marina Bay_2025                     97.94s
+  Melbourne_2022                      84.48s
+  Melbourne_2023                      82.63s
+  Melbourne_2024                      82.61s
+  Mexico City_2022                    84.15s
+  Mexico City_2023                    83.91s
+  Mexico City_2024                    82.01s
+  Mexico City_2025                    82.66s
+  Miami_2022                          94.84s
+  Miami_2023                          92.77s
+  Monaco_2024                         79.48s
+  Monaco_2025                         77.10s
+  Montréal_2022                       78.83s
+  Montréal_2023                       77.42s
+  Montréal_2025                       76.79s
+  Monza_2022                          87.18s
+  Monza_2023                          86.96s
+  Monza_2024                          84.86s
+  Monza_2025                          83.58s
+  Sakhir_2022                         99.33s
+  Sakhir_2023                         98.31s
+  Sakhir_2024                         96.85s
+  Sakhir_2025                         98.43s
+  Silverstone_2022                    94.14s
+  Silverstone_2023                    93.10s
+  Spa-Francorchamps_2022              114.35s
+  Spa-Francorchamps_2024              109.02s
+  Spielberg_2025                      70.71s
+  Suzuka_2023                         98.59s
+  Suzuka_2024                         97.44s
+  Suzuka_2025                         93.20s
+  Yas Island_2022                     91.27s
+  Yas Island_2023                     90.25s
+  Yas Island_2024                     89.66s
+  Yas Island_2025                     89.65s
+  Zandvoort_2022                      76.93s
+  Zandvoort_2024                      76.31s
+  Zandvoort_2025                      76.09s

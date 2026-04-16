@@ -1,0 +1,59 @@
+<svg width="100%" viewBox="0 0 800 500" role="img">
+  <title>F1 black-box lap time prediction pipeline</title>
+  <desc>Observed telemetry inputs feed directly into a black-box ML model, which outputs a predicted lap time used by a strategy optimiser. No engineered features or physics model.</desc>
+  <defs>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#AAAAAA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#E10600" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- SECTION LABEL -->
+  <text font-family="sans-serif" font-size="12" x="70" y="88" text-anchor="middle" fill="#AAAAAA">Observed inputs</text>
+
+  <!-- INPUT FEATURES BOX -->
+  <rect x="10" y="98" width="120" height="90" rx="8" fill="#2C2C2C" stroke="#E10600" stroke-width="1"/>
+  <text font-family="sans-serif" font-size="14" font-weight="500" x="70" y="128" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF">Input features</text>
+  <text font-family="sans-serif" font-size="11" x="70" y="148" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Telemetry data</text>
+  <text font-family="sans-serif" font-size="11" x="70" y="163" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Tyre compound</text>
+  <text font-family="sans-serif" font-size="11" x="70" y="178" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Fuel load · tyre age</text>
+
+  <!-- Arrow: input to black box -->
+  <line x1="130" y1="143" x2="258" y2="143" stroke="#AAAAAA" stroke-width="0.8" marker-end="url(#arrow-gray)" fill="none"/>
+
+  <!-- BLACK BOX ML MODEL -->
+  <text font-family="sans-serif" font-size="12" x="338" y="78" text-anchor="middle" fill="#AAAAAA">Black-box model</text>
+  <rect x="260" y="88" width="156" height="110" rx="8" fill="#2C2C2C" stroke="#4A90D9" stroke-width="1.2"/>
+  <text font-family="sans-serif" font-size="14" font-weight="500" x="338" y="124" text-anchor="middle" dominant-baseline="central" fill="#4A90D9">ML model</text>
+  <text font-family="sans-serif" font-size="12" x="338" y="144" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">No engineered features</text>
+  <text font-family="sans-serif" font-size="12" x="338" y="159" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">No physics prior</text>
+  <text font-family="sans-serif" font-size="12" x="338" y="174" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Internal structure opaque</text>
+
+  <!-- Arrow: black box to output -->
+  <line x1="416" y1="143" x2="544" y2="143" stroke="#AAAAAA" stroke-width="1.4" marker-end="url(#arrow-gray)" fill="none"/>
+
+  <!-- OUTPUT BOX -->
+  <rect x="546" y="115" width="96" height="56" rx="8" fill="#2C2C2C" stroke="#E10600" stroke-width="1.4"/>
+  <text font-family="sans-serif" font-size="14" font-weight="500" x="594" y="139" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF">Lap time</text>
+  <text font-family="sans-serif" font-size="12" x="594" y="157" text-anchor="middle" dominant-baseline="central" fill="#E10600">predicted</text>
+
+  <!-- Arrow: output to strategy -->
+  <line x1="594" y1="171" x2="594" y2="358" stroke="#AAAAAA" stroke-width="0.8" marker-end="url(#arrow-gray)" fill="none"/>
+
+  <!-- STRATEGY BOX -->
+  <rect x="438" y="360" width="312" height="56" rx="8" fill="#2C2C2C" stroke="#444444" stroke-width="0.8"/>
+  <text font-family="sans-serif" font-size="14" font-weight="500" x="594" y="384" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF">Strategy optimiser</text>
+  <text font-family="sans-serif" font-size="12" x="594" y="402" text-anchor="middle" dominant-baseline="central" fill="#AAAAAA">Pit window estimation · uncertainty analysis</text>
+
+  <!-- LEGEND -->
+  <rect x="10" y="430" width="700" height="60" rx="8" fill="#2C2C2C" stroke="#444444" stroke-width="0.5"/>
+  <text font-family="sans-serif" font-size="12" x="30" y="455" dominant-baseline="central" fill="#AAAAAA">Legend</text>
+  <rect x="90" y="444" width="34" height="16" rx="4" fill="#2C2C2C" stroke="#4A90D9" stroke-width="1"/>
+  <text font-family="sans-serif" font-size="12" x="132" y="452" dominant-baseline="central" fill="#AAAAAA">ML model block</text>
+  <rect x="280" y="444" width="34" height="16" rx="4" fill="#2C2C2C" stroke="#E10600" stroke-width="1"/>
+  <text font-family="sans-serif" font-size="12" x="322" y="452" dominant-baseline="central" fill="#AAAAAA">Input / output</text>
+  <line x1="470" y1="452" x2="504" y2="452" stroke="#AAAAAA" stroke-width="1.2"/>
+  <text font-family="sans-serif" font-size="12" x="512" y="452" dominant-baseline="central" fill="#AAAAAA">Data / signal flow</text>
+</svg>
