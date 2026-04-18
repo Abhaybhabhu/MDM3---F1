@@ -7,7 +7,7 @@ import matplotlib.animation as animation
 import matplotlib.patches as patches
 import pandas as pd
 
-def animate_tyre_health(df, driver, race_id, save_path=None, interval=400):
+def animate_tyre_health(df, driver, race_id, save_path=None, interval=500):
     """
     create health bar animation for a given Driver and RaceID
     """
@@ -29,12 +29,15 @@ def animate_tyre_health(df, driver, race_id, save_path=None, interval=400):
 
     tyre_health = driver_race_df['TyreHealth'].values
     laps = driver_race_df['RaceLapNumber'].values
+    compounds = driver_race_df['Compound'].values
+
+    tyre_hist = []
 
     fig, ax = plt.subplots(figsize=(9, 3.5))
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis('off')
-    fig.patch.set_facecolor('#111111')
+    fig.patch.set_facecolor('#1F1F1F')
 
     bg_bar = patches.Rectangle((0.05, 0.4), 0.9, 0.25, facecolor='#333333', edgecolor='#555555', linewidth=2, clip_on=False)
     ax.add_patch(bg_bar)
@@ -45,9 +48,32 @@ def animate_tyre_health(df, driver, race_id, save_path=None, interval=400):
     title_text = ax.text(0.5, 0.85, f"{driver.upper()} | {race_id}", ha='center', va='center',
                          fontsize=14, fontweight='bold', color='#FFFFFF')
     status_text = ax.text(0.5, 0.15, "", ha='center', va='center', fontsize=13, color='#AAAAAA', fontfamily='monospace')
+    history_text = ax.text(0.5, 0.05, "", ha='center', va='center', fontsize=11, color='#AAAAAA', fontfamily='monospace')
 
     def update(frame):
         val = tyre_health[frame]
+        compound = compounds[frame]
+
+        if frame > 0 and compound != compounds[frame - 1]:
+            prev_compound = compounds[frame - 1]
+            prev_final_health = tyre_health[frame - 1]
+            prev_lap = int(laps[frame - 1])
+            tyre_hist.append({
+                'lap': prev_lap,
+                'compound': prev_compound,
+                'health': prev_final_health
+            })
+
+        if frame == len(tyre_health) - 1:
+            curr_compound = compound
+            curr_final_health = val
+            curr_lap = int(laps[frame])
+            tyre_hist.append({
+                'lap': curr_lap,
+                'compound': curr_compound,
+                'health': curr_final_health
+            })
+
         fg_bar.set_width(val * 0.9)
 
         if val > 0.90:
@@ -57,13 +83,19 @@ def animate_tyre_health(df, driver, race_id, save_path=None, interval=400):
         else:
             fg_bar.set_facecolor('#FF3333')
 
-        status_text.set_text(f"LAP {int(laps[frame]):02d}  |  HEALTH: {val:.1%}")
-        return fg_bar, status_text, title_text
+        status_text.set_text(f"LAP {int(laps[frame]):02d}  |  {compound}  |  HEALTH: {val:.2%}")
+
+        history_text.set_text("")
+        for t in tyre_hist:
+            history_text.set_text(history_text.get_text() + f"Lap {t['lap']:02d} {t['compound']} {t['health']:.2%}\n")
+
+        return fg_bar, status_text, title_text, history_text
 
     def init():
         fg_bar.set_width(0)
         status_text.set_text("")
-        return fg_bar, status_text, title_text
+        history_text.set_text("")
+        return fg_bar, status_text, title_text, history_text
 
     ani = animation.FuncAnimation(fig, update, frames=len(tyre_health),
                                   init_func=init, interval=interval, blit=True, repeat=False)
@@ -78,4 +110,4 @@ def animate_tyre_health(df, driver, race_id, save_path=None, interval=400):
 
 if __name__== "__main__":
     df = pd.read_csv("data/processed/training_data_with_physics.csv")
-    animate_tyre_health(df, driver='RIC', race_id='2022_British Grand Prix', save_path=None)
+    animate_tyre_health(df, driver='RIC', race_id='2024_Spanish Grand Prix', save_path=None)

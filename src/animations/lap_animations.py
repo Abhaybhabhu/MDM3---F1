@@ -11,7 +11,6 @@ cache_location = "fastf1_cache/"
 
 import fastf1
 import matplotlib.pyplot as plt
-plt.style.use("dark_background")
 import matplotlib.animation as animation
 import numpy as np
 
@@ -29,7 +28,7 @@ def get_colour(team):
         'Alpine': '#2293D1',
         'Williams': '#64C4FF',
         'Alfa Romeo': '#900000',
-        'Haas': '#FFFFFF',
+        'Haas F1 Team': '#FFFFFF',
         'AlphaTauri': '#76F4F4',
         'Kick Sauber': '#900000',
         'RB': '#76F4F4',
@@ -121,13 +120,15 @@ def setup_plot(data, lap_number, year, show_data=True):
     initializes the matplotlib figure for single driver
     """
     fig, ax = plt.subplots(figsize=(10, 6))
+    fig.set_facecolor("#1F1F1F")
+
     ax.plot(data['track_x'], data['track_y'], color="#FFFFFF", linewidth=10)
-    ax.plot(data['x'], data['y'], color=data['colour'], linewidth=1, alpha=0.8)
+    ax.plot(data['x'], data['y'], color="#000000", linewidth=1, alpha=0.8)
 
     car_marker = ax.scatter([], [], s=100, c=data['colour'], edgecolors='black', zorder=5)
     trail_line, = ax.plot([], [], color='red', linewidth=2)
 
-    info_text = ax.text(0.5, 0.3, '', transform=ax.transAxes, fontsize=10, 
+    info_text = ax.text(0.5, 0.3, '', transform=ax.transAxes, fontsize=10, color="white",
                         verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
     info_text.set_visible(show_data)
 
@@ -137,7 +138,7 @@ def setup_plot(data, lap_number, year, show_data=True):
     lap_time = data['time'][-1]
     seconds = lap_time - 60
 
-    ax.set_title(f"{data['track']} {year} | {data['driver']} | Lap {lap_number} (1:{seconds:.3f})")
+    ax.set_title(f"{data['track']} {year} | {data['driver']} | Lap {lap_number} (1:{seconds:.3f})", color="white")
 
     return fig, ax, car_marker, trail_line, info_text
 
@@ -146,7 +147,8 @@ def setup_multiple_plot(all_data, lap_number, show_data=True):
     initializes the matplotlib figure for multiple drivers
     """
     fig, ax = plt.subplots(figsize=(12, 8))
-    
+    fig.set_facecolor("#1F1F1F")
+
     # get track data from first driver (all drivers are the same)
     first_driver = list(all_data.keys())[0]
     track_x = all_data[first_driver]['track_x']
@@ -240,7 +242,7 @@ def animate_single_driver_lap(session, driver, year, lap_number=1, show_data=Tru
 
     if save_path:
         print(f"Saving to {save_path}...")
-        anim.save(save_path, writer='ffmpeg', fps=60)
+        anim.save(save_path, writer='ffmpeg', fps=12)
     else:
         plt.show()
 
@@ -321,16 +323,20 @@ def animate_multiple_drivers_lap(session, drivers, lap_number=1, show_data=True,
 if __name__ == "__main__":
     fastf1.Cache.enable_cache(cache_location) 
 
-    year = 2024
-    event = 21
-    session_type = 'R' 
+    out_dir = 'anims/'
+    driver = 'VER'
+    year = 2025
+    event = 7
+    session_type = 'R'
+    lap = 5
 
     try:
         session = fastf1.get_session(year, event, session_type)
         session.load()
 
         # single driver example
-        animate_single_driver_lap(session, driver='VER', year=year, lap_number=48, show_data=True, save_path=None, interval=10)
+        animate_single_driver_lap(session, driver=driver, year=year, lap_number=lap, 
+                                  show_data=True, save_path=f'{out_dir}{driver}_{year}_{event}_{lap}.gif', interval=10)
 
         # multiple drivers example
         # animate_multiple_drivers_lap(session, drivers=['RUS', 'ALO', 'SAI'], lap_number=9, 

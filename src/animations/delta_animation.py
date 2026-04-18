@@ -45,6 +45,7 @@ def animate_ghost_comparison(session, driver, year, lap_number, pred_time,
 
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(12, 8))
+    fig.set_facecolor("#1F1F1F")
 
     ax.plot(actual_data['track_x'], actual_data['track_y'], color="#444444", linewidth=8)
     ax.plot(actual_data['x'], actual_data['y'], color=actual_data['colour'], linewidth=1, alpha=0.2)
@@ -66,7 +67,7 @@ def animate_ghost_comparison(session, driver, year, lap_number, pred_time,
     ax.axis('off')
     ax.set_title(f"{actual_data['track']} {year} | {driver} | Lap {lap_number}", color='white', pad=20)
 
-    fps = 60
+    fps = 24
     total_frames = int(max(actual_time, pred_secs) * fps)
 
     actual_fin = False
