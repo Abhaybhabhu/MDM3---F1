@@ -1,19 +1,20 @@
 """
-
 Predict F1 lap-time DELTAS
 using a two-tier feature architecture:
 
-  STRATEGY  — always available for future-lap simulation
-              (Compound, TireAge, Stint, Driver, Team, etc.)
-  PHYSICS   — modelled car / tyre state, projectable forward
-              via physics models the strategy engine maintains
-              (TyreHealth, Fz_N, TyreTemp_C)
+    STRATEGY  — lap N state used to predict lap N+1 time
+                            (Compound, TrackName, Driver, Team,
+                             StintNumber, RaceLapNumber)
+    PHYSICS   — modelled car / tyre state, projectable forward
+                via physics models the strategy engine maintains
+                (FuelProxy, TyreHealth, TyreTemp_C)
 
-Every feature is computable for any hypothetical future lap.
+Target is shifted LapTimeSec from lap N+1.
+Features are observed values from lap N.
 
 Input:
-    training_data_v3.parquet  — from build_v3_features.py
-    models/v3_feature_config.json  (optional, for auto-detection)
+    training_data_with_physics_shifted.parquet  — from build_v3_features.py
+    models/v3_feature_config.json  (optional)
 
 Output:
     models/pace_model.cbm
@@ -58,33 +59,22 @@ def detect_gpu() -> bool:
     print(" Detecting GPU availability…")
 
     try:
-        import subprocess
+        from catboost.utils import get_gpu_device_count
 
-        result = subprocess.run(
-            [
-                "nvidia-smi",
-                "--query-gpu=name,memory.total",
-                "--format=csv,noheader",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            for i, line in enumerate(
-                result.stdout.strip().split("\n")
-            ):
-                print(f"   GPU {i}: {line.strip()}")
-        else:
-            print("    No NVIDIA GPU detected")
-            return False
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        print("   not found")
+        gpu_count = int(get_gpu_device_count())
+    except Exception as e:
+        print(f"GPU query failed: {e}")
         return False
+
+    if gpu_count <= 0:
+        print("    No CUDA GPU detected by CatBoost")
+        return False
+
+    print(f"   CatBoost detected {gpu_count} CUDA device(s)")
 
     try:
         CatBoostRegressor(
-            iterations=5,
+            iterations=1,
             task_type="GPU",
             devices="0",
             verbose=0,
@@ -121,7 +111,7 @@ GROUP_KEY = "RaceID"
 # ── Feature Tiers ─────────────────────────────────────────────
 #
 # STRATEGY: deterministic — the strategy engine computes these
-# directly from the pit plan and race state.
+# directly from lap N race state.
 STRATEGY_CATEGORICAL = [
     "Compound",
     "TrackName",
@@ -130,19 +120,16 @@ STRATEGY_CATEGORICAL = [
 ]
 
 STRATEGY_NUMERICAL = [
-    # "TireAge",
-    # "TireAgeSq",
     "StintNumber",
     "RaceLapNumber",
-    "RaceLapFraction",
 ]
 
 # PHYSICS: projectable — the strategy engine computes these
 # via physics sub-models (fuel model, degradation model,
 # thermal model).  Optional: None → NaN → CatBoost ignores.
 PHYSICS_FEATURES = [
+    "FuelProxy",    # fuel model: race_lap_number / total_laps (normalised fuel burn)
     "TyreHealth",   # degradation model: f(compound, tire_age, track)
-    "Fz_N",         # fuel model: f(race_lap_number, total_laps)
     "TyreTemp_C",   # thermal model: f(compound, tire_age, track, ambient)
 ]
 
@@ -153,8 +140,8 @@ NUMERICAL_FEATURES = STRATEGY_NUMERICAL + PHYSICS_FEATURES
 
 ALL_FEATURES = CATEGORICAL_FEATURES + NUMERICAL_FEATURES
 
-# ── Auto-detect from v3 config ────────────────────────────────
-DATA_PATH = "training_data_v3.parquet"
+
+DATA_PATH = "training_data_with_physics_shifted.parquet"
 
 if V3_CONFIG_PATH.exists():
     try:
@@ -192,6 +179,10 @@ if V3_CONFIG_PATH.exists():
         print(f"Could not load V3 config: {_e}")
 
 # ── Outlier Filtering ─────────────────────────────────────────
+# Removes around 0.6% of laps  with extreme deltas.
+# Asymmetric quantiles reflect the right-skewed delta distribution:
+#   - Lower 0.1%  timing errors, anomalous fast laps
+#   - Upper 0.5%   pit in/out
 OUTLIER_CONFIG: dict[str, Any] = {
     "lower_quantile": 0.001,
     "upper_quantile": 0.995,
@@ -273,7 +264,12 @@ def load_data(path: str = DATA_PATH) -> pd.DataFrame:
         df["StintNumber"] = df["Stint"]
         print("Aliased Stint -> StintNumber")
 
-    skip_check = {"TireAgeSq", "RaceLapFraction"}
+    # Rename RaceLapFraction → FuelProxy if source data uses old name
+    if "FuelProxy" not in df.columns and "RaceLapFraction" in df.columns:
+        df["FuelProxy"] = df["RaceLapFraction"]
+        print("Aliased RaceLapFraction -> FuelProxy")
+
+    skip_check = {"TireAgeSq", "FuelProxy"}
     required = [
         c for c in ALL_FEATURES if c not in skip_check
     ] + [RAW_TARGET, GROUP_KEY]
@@ -341,17 +337,26 @@ def ensure_engineered_features(
         df["TireAgeSq"] = df["TireAge"] ** 2
         print("Engineered TireAgeSq")
 
-    if (
-        "RaceLapFraction" not in df.columns
-        and "RaceLapNumber" in df.columns
-    ):
-        max_laps = df.groupby(GROUP_KEY)[
-            "RaceLapNumber"
-        ].transform("max")
-        df["RaceLapFraction"] = (
-            df["RaceLapNumber"] / max_laps
-        ).clip(0.0, 1.0)
-        print("Engineered RaceLapFraction")
+    if "RaceID" in df.columns:
+        df["RaceID"] = df["RaceID"].astype(str)
+
+    # Engineer FuelProxy (normalised race progress as fuel burn proxy)
+    if "FuelProxy" not in df.columns:
+        if "RaceLapFraction" in df.columns:
+            df["FuelProxy"] = df["RaceLapFraction"]
+            print("Engineered FuelProxy from RaceLapFraction")
+        elif "RaceLapNumber" in df.columns:
+            max_laps = df.groupby(GROUP_KEY)[
+                "RaceLapNumber"
+            ].transform("max")
+            df["FuelProxy"] = (
+                df["RaceLapNumber"] / max_laps
+            ).clip(0.0, 1.0)
+            print("Engineered FuelProxy from RaceLapNumber / TotalLaps")
+
+    if "TotalRaceLaps" not in df.columns and "RaceLapNumber" in df.columns:
+        df["TotalRaceLaps"] = df.groupby(GROUP_KEY)["RaceLapNumber"].transform("max")
+        print("Engineered TotalRaceLaps")
 
     if "Season" not in df.columns:
         if "RaceDate" in df.columns:
@@ -1194,7 +1199,7 @@ def analyse_features(
         "TireAgeSq",
         "Compound",
         "RaceLapNumber",
-        "RaceLapFraction",
+        "FuelProxy",
         "StintNumber",
         "TyreHealth",
     }
@@ -1571,8 +1576,8 @@ class PacePredictor:
         race_lap_number: int = 1,
         total_race_laps: Optional[int] = None,
         tyre_health: Optional[float] = None,
-        fz_n: Optional[float] = None,
         tyre_temp_c: Optional[float] = None,
+        fuel_proxy: Optional[float] = None,
         season: Optional[int] = None,
     ) -> float:
         """
@@ -1595,13 +1600,14 @@ class PacePredictor:
         race_lap_number : int
             Current lap in the race.
         total_race_laps : int, optional
-            Total laps in race (for RaceLapFraction).
+            Total laps in race (for FuelProxy computation).
         tyre_health : float, optional
             Projected tyre health from degradation model.
-        fz_n : float, optional
-            Projected vertical force from fuel model.
         tyre_temp_c : float, optional
             Projected tyre temperature from thermal model.
+        fuel_proxy : float, optional
+            Normalised race progress (0.0–1.0). If None,
+            computed from race_lap_number / total_race_laps.
         season : int, optional
             Season year for baseline lookup.
 
@@ -1620,8 +1626,8 @@ class PacePredictor:
             race_lap_number=race_lap_number,
             total_race_laps=total_race_laps,
             tyre_health=tyre_health,
-            fz_n=fz_n,
             tyre_temp_c=tyre_temp_c,
+            fuel_proxy=fuel_proxy,
         )
         pool = Pool(row, cat_features=self._cat_indices)
         delta = float(self.model.predict(pool)[0])
@@ -1639,8 +1645,8 @@ class PacePredictor:
         race_lap_number: int = 1,
         total_race_laps: Optional[int] = None,
         tyre_health: Optional[float] = None,
-        fz_n: Optional[float] = None,
         tyre_temp_c: Optional[float] = None,
+        fuel_proxy: Optional[float] = None,
     ) -> float:
         """
         Predict raw delta only (no baseline added).
@@ -1658,8 +1664,8 @@ class PacePredictor:
             race_lap_number=race_lap_number,
             total_race_laps=total_race_laps,
             tyre_health=tyre_health,
-            fz_n=fz_n,
             tyre_temp_c=tyre_temp_c,
+            fuel_proxy=fuel_proxy,
         )
         pool = Pool(row, cat_features=self._cat_indices)
         return float(self.model.predict(pool)[0])
@@ -1675,8 +1681,8 @@ class PacePredictor:
         race_lap_number: int = 1,
         total_race_laps: Optional[int] = None,
         tyre_health: Optional[float] = None,
-        fz_n: Optional[float] = None,
         tyre_temp_c: Optional[float] = None,
+        fuel_proxy: Optional[float] = None,
         season: Optional[int] = None,
         n_ensembles: int = 10,
     ) -> tuple[float, float]:
@@ -1696,8 +1702,8 @@ class PacePredictor:
             race_lap_number=race_lap_number,
             total_race_laps=total_race_laps,
             tyre_health=tyre_health,
-            fz_n=fz_n,
             tyre_temp_c=tyre_temp_c,
+            fuel_proxy=fuel_proxy,
         )
         pool = Pool(row, cat_features=self._cat_indices)
 
@@ -1747,24 +1753,25 @@ class PacePredictor:
         ):
             df["TireAgeSq"] = df["TireAge"] ** 2
 
-        if (
-            "RaceLapFraction" not in df.columns
-            and "RaceLapNumber" in df.columns
-        ):
-            if "TotalRaceLaps" in df.columns:
-                df["RaceLapFraction"] = (
-                    df["RaceLapNumber"]
-                    / df["TotalRaceLaps"]
-                ).clip(0.0, 1.0)
-            elif GROUP_KEY in df.columns:
-                max_laps = df.groupby(GROUP_KEY)[
-                    "RaceLapNumber"
-                ].transform("max")
-                df["RaceLapFraction"] = (
-                    df["RaceLapNumber"] / max_laps
-                ).clip(0.0, 1.0)
-            else:
-                df["RaceLapFraction"] = 0.5
+        # Engineer FuelProxy from available columns
+        if "FuelProxy" not in df.columns:
+            if "RaceLapFraction" in df.columns:
+                df["FuelProxy"] = df["RaceLapFraction"]
+            elif "RaceLapNumber" in df.columns:
+                if "TotalRaceLaps" in df.columns:
+                    df["FuelProxy"] = (
+                        df["RaceLapNumber"]
+                        / df["TotalRaceLaps"]
+                    ).clip(0.0, 1.0)
+                elif GROUP_KEY in df.columns:
+                    max_laps = df.groupby(GROUP_KEY)[
+                        "RaceLapNumber"
+                    ].transform("max")
+                    df["FuelProxy"] = (
+                        df["RaceLapNumber"] / max_laps
+                    ).clip(0.0, 1.0)
+                else:
+                    df["FuelProxy"] = 0.5
 
         # Stint feature naming compatibility for batch inference.
         if "StintNumber" not in df.columns and "Stint" in df.columns:
@@ -1866,10 +1873,11 @@ class PacePredictor:
                 compound, tire_age, stint,
                 race_lap_number, total_laps, track_name
             ) → dict with optional keys:
-                "tyre_health", "fz_n", "tyre_temp_c"
+                "tyre_health", "tyre_temp_c", "fuel_proxy"
             Returns physics projections for each lap.
             If None, physics features are NaN (CatBoost
-            falls back to strategy tier).
+            falls back to strategy tier) except FuelProxy
+            which is computed from race progress.
 
         Returns
         -------
@@ -1919,8 +1927,8 @@ class PacePredictor:
         for entry in schedule:
             # Project physics if model provided
             tyre_health = None
-            fz_n = None
             tyre_temp_c = None
+            fuel_proxy = None
 
             if physics_projector is not None:
                 try:
@@ -1933,10 +1941,17 @@ class PacePredictor:
                         track_name=track_name,
                     )
                     tyre_health = physics.get("tyre_health")
-                    fz_n = physics.get("fz_n")
                     tyre_temp_c = physics.get("tyre_temp_c")
+                    fuel_proxy = physics.get("fuel_proxy")
                 except Exception:
                     pass
+
+            # Default FuelProxy from race progress if not
+            # provided by physics projector
+            if fuel_proxy is None:
+                fuel_proxy = min(
+                    1.0, entry["lap"] / total_laps
+                )
 
             predicted = self.predict(
                 compound=entry["compound"],
@@ -1948,8 +1963,8 @@ class PacePredictor:
                 race_lap_number=entry["lap"],
                 total_race_laps=total_laps,
                 tyre_health=tyre_health,
-                fz_n=fz_n,
                 tyre_temp_c=tyre_temp_c,
+                fuel_proxy=fuel_proxy,
                 season=season,
             )
             lap_times.append(predicted)
@@ -1981,8 +1996,8 @@ class PacePredictor:
         race_lap_number: int = 1,
         total_race_laps: Optional[int] = None,
         tyre_health: Optional[float] = None,
-        fz_n: Optional[float] = None,
         tyre_temp_c: Optional[float] = None,
+        fuel_proxy: Optional[float] = None,
     ) -> pd.DataFrame:
         """
         Build a single-row DataFrame matching the model's
@@ -1993,12 +2008,16 @@ class PacePredictor:
         """
         tire_age_sq = tire_age ** 2
 
-        if total_race_laps and total_race_laps > 0:
-            race_lap_fraction = min(
+        # Compute FuelProxy: use explicit value, derive from
+        # race progress, or fall back to 0.5
+        if fuel_proxy is not None:
+            fuel_proxy_val = float(fuel_proxy)
+        elif total_race_laps and total_race_laps > 0:
+            fuel_proxy_val = min(
                 1.0, race_lap_number / total_race_laps
             )
         else:
-            race_lap_fraction = 0.5
+            fuel_proxy_val = 0.5
 
         row_data: dict[str, Any] = {
             # Strategy categorical
@@ -2013,15 +2032,12 @@ class PacePredictor:
             # Backward compatibility for models trained with legacy naming.
             "Stint": int(stint),
             "RaceLapNumber": int(race_lap_number),
-            "RaceLapFraction": float(race_lap_fraction),
-            # Physics (None → NaN)
+            # Physics
+            "FuelProxy": float(fuel_proxy_val),
             "TyreHealth": (
                 float(tyre_health)
                 if tyre_health is not None
                 else np.nan
-            ),
-            "Fz_N": (
-                float(fz_n) if fz_n is not None else np.nan
             ),
             "TyreTemp_C": (
                 float(tyre_temp_c)
@@ -2185,16 +2201,16 @@ if __name__ == "__main__":
             and pd.notna(sample.get("TyreHealth"))
             else None
         ),
-        fz_n=(
-            float(sample["Fz_N"])
-            if "Fz_N" in sample.index
-            and pd.notna(sample.get("Fz_N"))
-            else None
-        ),
         tyre_temp_c=(
             float(sample["TyreTemp_C"])
             if "TyreTemp_C" in sample.index
             and pd.notna(sample.get("TyreTemp_C"))
+            else None
+        ),
+        fuel_proxy=(
+            float(sample["FuelProxy"])
+            if "FuelProxy" in sample.index
+            and pd.notna(sample.get("FuelProxy"))
             else None
         ),
         season=sample_season,
@@ -2216,16 +2232,16 @@ if __name__ == "__main__":
             and pd.notna(sample.get("TyreHealth"))
             else None
         ),
-        fz_n=(
-            float(sample["Fz_N"])
-            if "Fz_N" in sample.index
-            and pd.notna(sample.get("Fz_N"))
-            else None
-        ),
         tyre_temp_c=(
             float(sample["TyreTemp_C"])
             if "TyreTemp_C" in sample.index
             and pd.notna(sample.get("TyreTemp_C"))
+            else None
+        ),
+        fuel_proxy=(
+            float(sample["FuelProxy"])
+            if "FuelProxy" in sample.index
+            and pd.notna(sample.get("FuelProxy"))
             else None
         ),
         season=sample_season,
@@ -2437,7 +2453,7 @@ if __name__ == "__main__":
         for issue in issues:
             print(f"    {issue}")
         print(f"\n Suggestions:")
-        if any("Physics" in i or "TyreHealth" in i or "Fz_N" in i or "TyreTemp" in i for i in issues):
+        if any("Physics" in i or "TyreHealth" in i or "FuelProxy" in i or "TyreTemp" in i for i in issues):
             print(
                 "     - Check physics feature distributions "
                 "with: df[PHYSICS_FEATURES].describe()"
