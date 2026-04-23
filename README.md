@@ -8,14 +8,13 @@ This is a 10-credit group project for third-year EngMaths students at University
 
 ## Research Question
 
-Can a physics-based model of features aid in neural network's prediction of lap time, and how can we use it to aid strategic decisions?
+Can a physics-based model of features aid in neural network's prediction of lap time, and how significantly?
 
 ---
 
 
 | Section | Description |
 |---|---|
-| [Research Question](#research-question) | What we're trying to answer |
 | [Model Overview](#model-overview) | ODE system |
 | [Repository Structure](#repository-structure) | Folder layout |
 | [Setup](#setup) | Installation and data regeneration |
@@ -54,7 +53,7 @@ f1-tyre-degradation/
 └── README.md
 ```
 
-Notebooks are for narrative and figures. All model logic would live in `src/` and be imported into notebooks.
+Notebooks are for data exploration/producing some figures.
 
 ---
 
